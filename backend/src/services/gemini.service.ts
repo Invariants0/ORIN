@@ -1,6 +1,5 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
-import envVars from "@/config/envVars.js";
 import logger from "@/config/logger.js";
+import promptEngineService, { PromptTemplate } from './prompt-engine.service.js';
 
 export interface ClassificationResult {
   title: string;
@@ -16,42 +15,34 @@ export interface AnalysisResult {
   references: string[];
 }
 
-export class GeminiService {
-  private genAI: GoogleGenerativeAI;
-  private model: any;
+export interface DocumentResult {
+  title: string;
+  content: string;
+  sections: string[];
+  metadata: Record<string, any>;
+}
 
+export class GeminiService {
   constructor() {
-    this.genAI = new GoogleGenerativeAI(envVars.GEMINI_API_KEY);
-    this.model = this.genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+    // All Gemini interactions now go through prompt engine
   }
 
   async classifyContent(input: string): Promise<ClassificationResult> {
-    const prompt = `You are a content classification assistant. Analyze the following input and return a structured JSON response.
-
-Input: "${input}"
-
-Return ONLY valid JSON in this exact format:
-{
-  "title": "A concise title for this content",
-  "type": "idea|task|note|research|code",
-  "tags": ["tag1", "tag2"],
-  "summary": "Brief summary in 1-2 sentences",
-  "content": "Full processed content"
-}`;
-
     try {
-      const result = await this.model.generateContent(prompt);
-      const response = await result.response;
-      const text = response.text();
-      
-      // Extract JSON from markdown code blocks if present
-      const jsonMatch = text.match(/```(?:json)?\s*({[\s\S]*?})\s*```/);
-      const jsonString = jsonMatch ? jsonMatch[1] : text;
-      
-      const parsed = JSON.parse(jsonString) as ClassificationResult;
-      
+      logger.info("[Gemini] Classifying content via prompt engine");
+
+      const response = await promptEngineService.generateFromTemplate<ClassificationResult>(
+        PromptTemplate.CONTENT_CLASSIFICATION,
+        input
+      );
+
+      if (response.status !== 'success') {
+        throw new Error('Failed to classify content');
+      }
+
       logger.info("[Gemini] Content classified successfully");
-      return parsed;
+      return response.data;
+
     } catch (error) {
       logger.error("[Gemini] Failed to classify content", error);
       throw error;
@@ -59,62 +50,45 @@ Return ONLY valid JSON in this exact format:
   }
 
   async analyzeWithContext(query: string, context: string): Promise<AnalysisResult> {
-    const prompt = `You are an intelligent analysis assistant. Answer the user's query using the provided context.
-
-Query: "${query}"
-
-Context from Notion:
-${context}
-
-Provide your answer in this exact JSON format:
-{
-  "summary": "Direct answer to the query",
-  "insights": ["Key insight 1", "Key insight 2", "Key insight 3"],
-  "references": ["Reference link or source 1", "Reference link or source 2"]
-}`;
-
     try {
-      const result = await this.model.generateContent(prompt);
-      const response = await result.response;
-      const text = response.text();
-      
-      const jsonMatch = text.match(/```(?:json)?\s*({[\s\S]*?})\s*```/);
-      const jsonString = jsonMatch ? jsonMatch[1] : text;
-      
-      const parsed = JSON.parse(jsonString) as AnalysisResult;
-      
+      logger.info("[Gemini] Analyzing with context via prompt engine");
+
+      const response = await promptEngineService.generateFromTemplate<AnalysisResult>(
+        PromptTemplate.CONTEXT_ANALYSIS,
+        query,
+        { context }
+      );
+
+      if (response.status !== 'success') {
+        throw new Error('Failed to analyze context');
+      }
+
       logger.info("[Gemini] Analysis completed successfully");
-      return parsed;
+      return response.data;
+
     } catch (error) {
       logger.error("[Gemini] Failed to analyze context", error);
       throw error;
     }
   }
 
-  async generateDocument(topic: string, context?: string): Promise<any> {
-    const prompt = `You are a professional document generator. Create a structured document about: "${topic}"
-
-${context ? `Additional context:\n${context}\n` : ""}
-
-Generate a structured document with:
-- Clear title
-- Section headings (H2, H3)
-- Bullet points for key information
-- Tables where appropriate
-- Professional formatting
-
-Return the content in a structured format that can be converted to Notion blocks.`;
-
+  async generateDocument(topic: string, context?: string): Promise<DocumentResult> {
     try {
-      const result = await this.model.generateContent(prompt);
-      const response = await result.response;
-      const text = response.text();
-      
+      logger.info("[Gemini] Generating document via prompt engine");
+
+      const response = await promptEngineService.generateFromTemplate<DocumentResult>(
+        PromptTemplate.DOCUMENT_GENERATION,
+        topic,
+        { topic, context }
+      );
+
+      if (response.status !== 'success') {
+        throw new Error('Failed to generate document');
+      }
+
       logger.info("[Gemini] Document generated successfully");
-      return {
-        title: topic,
-        content: text,
-      };
+      return response.data;
+
     } catch (error) {
       logger.error("[Gemini] Failed to generate document", error);
       throw error;
@@ -122,7 +96,12 @@ Return the content in a structured format that can be converted to Notion blocks
   }
 
   async continueWork(lastSession: string, relatedContext: string): Promise<string> {
-    const prompt = `You are a productivity assistant helping to resume work.
+    try {
+      logger.info("[Gemini] Generating continue work suggestions");
+
+      // For now, use a simplified approach until we have a dedicated template
+      const response = await promptEngineService.generateStructuredResponse({
+        systemPrompt: `You are a productivity assistant helping to resume work.
 
 Last session summary:
 ${lastSession}
@@ -133,17 +112,26 @@ ${relatedContext}
 Provide:
 1. Brief summary of what was accomplished
 2. Current status
-3. Suggested next steps (3-5 actionable items)
+3. Suggested next steps (3-5 actionable items)`,
+        userInput: 'Generate continue work suggestions',
+        schema: {
+          summary: 'string',
+          status: 'string',
+          nextSteps: 'array'
+        }
+      });
 
-Format your response clearly with sections.`;
+      if (response.status !== 'success') {
+        throw new Error('Failed to generate continue work suggestions');
+      }
 
-    try {
-      const result = await this.model.generateContent(prompt);
-      const response = await result.response;
-      const text = response.text();
-      
+      // Format the response as text
+      const data = response.data as any;
+      const formatted = `Summary: ${data.summary}\n\nStatus: ${data.status}\n\nNext Steps:\n${data.nextSteps.map((step: string, i: number) => `${i + 1}. ${step}`).join('\n')}`;
+
       logger.info("[Gemini] Continue work suggestions generated");
-      return text;
+      return formatted;
+
     } catch (error) {
       logger.error("[Gemini] Failed to generate continue work suggestions", error);
       throw error;
