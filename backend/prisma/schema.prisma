@@ -118,3 +118,89 @@ model DecisionMetrics {
   @@index([createdAt])
   @@map("decision_metrics")
 }
+
+model Workflow {
+  id          String   @id @default(cuid())
+  userId      String
+  sessionId   String
+  goal        String   @db.Text
+  status      String   @default("pending") // pending | running | paused | completed | failed
+  currentStep String?
+  pauseReason String?  @db.Text
+  metadata    Json?    // Additional workflow metadata
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  startedAt   DateTime?
+  completedAt DateTime?
+  lockedBy    String?  // Worker ID that locked this workflow
+  lockedAt    DateTime?
+
+  steps   WorkflowStep[]
+  results WorkflowResult[]
+
+  @@index([userId])
+  @@index([sessionId])
+  @@index([status])
+  @@index([lockedBy])
+  @@index([createdAt])
+  @@map("workflows")
+}
+
+model WorkflowStep {
+  id                String   @id @default(cuid())
+  workflowId        String
+  stepId            String   // Logical step ID (e.g., "step_1")
+  name              String
+  action            String
+  parameters        Json
+  dependencies      Json     // Array of step IDs
+  riskLevel         String   // low | medium | high
+  estimatedDuration Int      // milliseconds
+  retryable         Boolean  @default(true)
+  maxRetries        Int      @default(3)
+  status            String   @default("pending") // pending | running | completed | failed | skipped
+  attempts          Int      @default(0)
+  error             String?  @db.Text
+  output            Json?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  startedAt         DateTime?
+  completedAt       DateTime?
+  timeoutAt         DateTime?
+
+  workflow Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@unique([workflowId, stepId])
+  @@index([workflowId])
+  @@index([status])
+  @@index([timeoutAt])
+  @@map("workflow_steps")
+}
+
+model WorkflowResult {
+  id         String   @id @default(cuid())
+  workflowId String
+  stepId     String
+  output     Json
+  createdAt  DateTime @default(now())
+
+  workflow Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@index([workflowId])
+  @@index([stepId])
+  @@map("workflow_results")
+}
+
+model WorkflowQueue {
+  id         String   @id @default(cuid())
+  workflowId String
+  stepId     String
+  priority   Int      @default(0)
+  retryCount Int      @default(0)
+  scheduledAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  @@index([scheduledAt])
+  @@index([priority])
+  @@map("workflow_queue")
+}
