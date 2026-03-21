@@ -17,22 +17,104 @@ model User {
   geminiKey   String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  
+
   sessions Session[]
-  
+
   @@map("users")
 }
 
 model Session {
   id        String   @id @default(cuid())
   userId    String
-  title     String
-  messages  Json     @default("[]")
+  title     String?
+  summary   String?
   mode      String   @default("explore") // explore | build
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages Message[]
+
+  @@index([userId])
+  @@index([createdAt])
   @@map("sessions")
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  sessionId String
+  role      String // user | assistant
+  content   String   @db.Text
+  intent    String? // STORE | QUERY | GENERATE_DOC | OPERATE | UNCLEAR
+  metadata  Json? // Additional metadata (processing time, confidence, etc.)
+  createdAt DateTime @default(now())
+
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([createdAt])
+  @@map("messages")
+}
+
+model Task {
+  id          String   @id @default(cuid())
+  sessionId   String
+  userId      String
+  goal        String   @db.Text
+  title       String
+  description String   @db.Text
+  status      String   @default("pending") // pending | in_progress | done | cancelled
+  priority    String   @default("medium") // high | medium | low
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  metrics TaskMetrics?
+
+  @@index([sessionId])
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("tasks")
+}
+
+model TaskMetrics {
+  id            String   @id @default(cuid())
+  taskId        String   @unique
+  estimatedTime String?  // e.g., "2-3 hours", "30 minutes"
+  actualTime    Int?     // in minutes
+  success       Boolean  @default(true)
+  startedAt     DateTime?
+  completedAt   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@index([success])
+  @@index([createdAt])
+  @@map("task_metrics")
+}
+
+model DecisionMetrics {
+  id             String   @id @default(cuid())
+  userId         String
+  sessionId      String?
+  input          String   @db.Text
+  strategy       String   // decompose | execute | resume | respond | ask
+  confidence     Float
+  reasoning      String   @db.Text
+  success        Boolean  @default(true)
+  userFeedback   String?  @db.Text
+  contextFactors Json?    // Array of context factors
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([userId])
+  @@index([sessionId])
+  @@index([strategy])
+  @@index([success])
+  @@index([createdAt])
+  @@map("decision_metrics")
 }
