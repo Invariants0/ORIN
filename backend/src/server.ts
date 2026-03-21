@@ -1,78 +1,54 @@
-import express from "express";
-import cors from "cors";
-import helmet from "helmet";
-import morgan from "morgan";
 import dotenv from "dotenv";
 
 // Load environment variables first
 dotenv.config();
 
+import app from "./app.js";
+import db from "./config/database.js";
 import envVars from "./config/envVars.js";
 import logger from "./config/logger.js";
-import healthRoutes from "./routes/health.routes.js";
-import chatRoutes from "./routes/chat.routes.js";
-import { APIError } from "./utils/errors.js";
 
-const app = express();
+async function startServer() {
+  try {
+    await db.$connect();
+    logger.info("[Prisma] Database connection established.");
 
-// Security middleware
-app.use(helmet());
+    const PORT = envVars.PORT;
+    const server = app.listen(PORT, () => {
+      logger.info(`🚀 ORIN Server running on port ${PORT}`);
+      logger.info(`📍 Environment: ${envVars.NODE_ENV}`);
+      logger.info(`🌐 Health check: http://localhost:${PORT}/api/health`);
+    });
 
-// CORS configuration
-app.use(
-  cors({
-    origin: envVars.FRONTEND_URL,
-    credentials: true,
-  })
-);
+    process.on("SIGTERM", async () => {
+      logger.info("SIGTERM received: closing server and DB connection...");
+      server.close(async () => {
+        await db.$disconnect();
+        process.exit(0);
+      });
+    });
 
-// Body parsing middleware
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+    process.on("SIGINT", async () => {
+      logger.info("SIGINT received: closing server and DB connection...");
+      server.close(async () => {
+        await db.$disconnect();
+        process.exit(0);
+      });
+    });
 
-// Logging middleware
-if (envVars.NODE_ENV === "development") {
-  app.use(morgan("dev"));
+    process.on("unhandledRejection", (reason) => {
+      logger.error("Unhandled Rejection:", reason);
+    });
+
+    process.on("uncaughtException", (error) => {
+      logger.error("Uncaught Exception:", error);
+      process.exit(1);
+    });
+  } catch (error) {
+    logger.error("Failed to start server:", error);
+    process.exit(1);
+  }
 }
 
-// Routes
-app.use("/api", healthRoutes);
-app.use("/api/v1", chatRoutes);
+startServer();
 
-// 404 handler
-app.use((req, res) => {
-  res.status(404).json({
-    status: "error",
-    message: `Route ${req.method} ${req.path} not found`,
-  });
-});
-
-// Global error handler
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  if (err instanceof APIError) {
-    return res.status(err.statusCode).json({
-      code: err.statusCode,
-      message: err.message,
-      stack: envVars.NODE_ENV === "development" ? err.stack : undefined,
-    });
-  }
-
-  logger.error("[Express] Unhandled error:", err);
-
-  res.status(500).json({
-    code: 500,
-    message: envVars.NODE_ENV === "development" ? err.message : "Internal server error",
-    stack: envVars.NODE_ENV === "development" ? err.stack : undefined,
-  });
-});
-
-// Start server
-const PORT = envVars.PORT;
-
-app.listen(PORT, () => {
-  logger.info(`🚀 ORIN Server running on port ${PORT}`);
-  logger.info(`📍 Environment: ${envVars.NODE_ENV}`);
-  logger.info(`🌐 Health check: http://localhost:${PORT}/api/health`);
-});
-
-export default app;
