@@ -8,6 +8,7 @@ import logger from "./config/logger.js";
 import healthRoutes from "./routes/health.routes.js";
 import chatRoutes from "./routes/chat.routes.js";
 import intentRoutes from "./routes/intent.routes.js";
+import workflowRoutes from "./routes/workflow.routes.js";
 import { APIError } from "./utils/errors.js";
 
 const app = express();
@@ -36,6 +37,7 @@ if (envVars.NODE_ENV === "development") {
 app.use("/api", healthRoutes);
 app.use("/api/v1", chatRoutes);
 app.use("/api/v1/intent", intentRoutes);
+app.use("/api/v1/workflows", workflowRoutes);
 
 // 404 handler
 app.use((req, res) => {

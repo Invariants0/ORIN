@@ -7,6 +7,9 @@ import app from "./app.js";
 import db from "./config/database.js";
 import envVars from "./config/envVars.js";
 import logger from "./config/logger.js";
+import { websocketGateway } from "./services/websocket.gateway.js";
+import { monitoringService } from "./services/monitoring.service.js";
+import { workflowRunnerService } from "./services/workflow-runner.service.js";
 
 async function startServer() {
   try {
@@ -20,9 +23,24 @@ async function startServer() {
       logger.info(`🌐 Health check: http://localhost:${PORT}/api/health`);
     });
 
+    // Initialize WebSocket server
+    websocketGateway.initialize(server);
+    logger.info('✅ WebSocket server initialized');
+
+    // Start monitoring service
+    monitoringService.start();
+    logger.info('✅ Monitoring service started');
+
+    // Start workflow runner
+    workflowRunnerService.start();
+    logger.info('✅ Workflow runner started');
+
     process.on("SIGTERM", async () => {
       logger.info("SIGTERM received: closing server and DB connection...");
       server.close(async () => {
+        websocketGateway.shutdown();
+        monitoringService.stop();
+        workflowRunnerService.stop();
         await db.$disconnect();
         process.exit(0);
       });
@@ -31,6 +49,9 @@ async function startServer() {
     process.on("SIGINT", async () => {
       logger.info("SIGINT received: closing server and DB connection...");
       server.close(async () => {
+        websocketGateway.shutdown();
+        monitoringService.stop();
+        workflowRunnerService.stop();
         await db.$disconnect();
         process.exit(0);
       });
