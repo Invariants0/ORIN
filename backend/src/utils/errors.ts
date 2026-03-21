@@ -30,3 +30,4 @@ export class APIError extends Error {
     return new APIError(500, message, false);
   }
 }
+
