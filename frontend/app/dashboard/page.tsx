@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import { Sidebar } from "@/components/sidebar/Sidebar";
 import { ChatWindow } from "@/components/chat/ChatWindow";
 import { InputBox } from "@/components/chat/InputBox";
@@ -148,7 +150,14 @@ export default function DashboardPage() {
       <div className="flex-1 flex flex-col">
         {/* Top Bar */}
         <div className="flex items-center justify-between p-4 border-b">
-          <h1 className="text-xl font-bold">ORIN</h1>
+          <div className="flex items-center gap-4">
+            <h1 className="text-xl font-bold">ORIN</h1>
+            <Link href="/workflows">
+              <Button variant="ghost" size="sm">
+                Workflows
+              </Button>
+            </Link>
+          </div>
           <ModeToggle mode={mode} onModeChange={setMode} />
         </div>
 
