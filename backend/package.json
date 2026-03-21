@@ -1,0 +1,38 @@
+{
+  "name": "orin-backend",
+  "version": "1.0.0",
+  "description": "ORIN Context Operating System - Backend API",
+  "type": "module",
+  "scripts": {
+    "dev": "bun run --watch src/server.ts",
+    "start": "bun run src/server.ts",
+    "build": "tsc",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate dev",
+    "seed": "bun run src/scripts/seed.ts"
+  },
+  "keywords": ["orin", "notion", "ai", "context"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "@notionhq/client": "^5.14.0",
+    "@prisma/client": "^6.3.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^5.0.0",
+    "helmet": "^7.1.0",
+    "morgan": "^1.10.0",
+    "winston": "^3.11.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.1.13",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/morgan": "^1.9.9",
+    "prisma": "^6.3.0",
+    "typescript": "^5.7.2"
+  }
+}
