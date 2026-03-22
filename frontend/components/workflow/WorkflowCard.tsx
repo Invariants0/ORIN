@@ -5,6 +5,7 @@ import { Progress } from '@/components/ui/progress';
 import { formatDistanceToNow } from 'date-fns';
 import { Clock, CheckCircle2, XCircle, Pause, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { memo } from 'react';
 
 interface WorkflowCardProps {
   workflow: Workflow;
@@ -20,7 +21,7 @@ const statusConfig = {
   cancelled: { color: 'bg-gray-500', icon: XCircle, label: 'Cancelled' },
 };
 
-export function WorkflowCard({ workflow, onClick }: WorkflowCardProps) {
+export const WorkflowCard = memo(function WorkflowCard({ workflow, onClick }: WorkflowCardProps) {
   const config = statusConfig[workflow.status];
   const Icon = config.icon;
 
@@ -76,4 +77,12 @@ export function WorkflowCard({ workflow, onClick }: WorkflowCardProps) {
       </div>
     </Card>
   );
-}
+}, (prevProps, nextProps) => {
+  // Custom comparison for optimization
+  return (
+    prevProps.workflow.id === nextProps.workflow.id &&
+    prevProps.workflow.status === nextProps.workflow.status &&
+    prevProps.workflow.progress === nextProps.workflow.progress &&
+    prevProps.workflow.updatedAt === nextProps.workflow.updatedAt
+  );
+});

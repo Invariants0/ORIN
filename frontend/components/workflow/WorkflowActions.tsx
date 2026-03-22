@@ -10,59 +10,46 @@ import {
 } from '@/components/ui/dialog';
 import { Pause, Play, XCircle } from 'lucide-react';
 import { WorkflowStatus } from '@/lib/types/workflow.types';
-import { pauseWorkflow, resumeWorkflow, cancelWorkflow } from '@/lib/api';
+import { usePauseWorkflow, useResumeWorkflow, useCancelWorkflow } from '@/hooks/queries/useWorkflowQueries';
 import { toast } from 'sonner';
 
 interface WorkflowActionsProps {
   workflowId: string;
   status: WorkflowStatus;
-  onActionComplete?: () => void;
 }
 
-export function WorkflowActions({ workflowId, status, onActionComplete }: WorkflowActionsProps) {
-  const [isLoading, setIsLoading] = useState(false);
+export function WorkflowActions({ workflowId, status }: WorkflowActionsProps) {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
 
-  const handlePause = async () => {
-    setIsLoading(true);
-    try {
-      await pauseWorkflow(workflowId);
-      toast.success('Workflow paused successfully');
-      onActionComplete?.();
-    } catch (error) {
-      toast.error(`Failed to pause workflow: ${(error as Error).message}`);
-    } finally {
-      setIsLoading(false);
-    }
+  const pauseMutation = usePauseWorkflow();
+  const resumeMutation = useResumeWorkflow();
+  const cancelMutation = useCancelWorkflow();
+
+  const handlePause = () => {
+    pauseMutation.mutate(workflowId, {
+      onSuccess: () => toast.success('Workflow paused successfully'),
+      onError: (error) => toast.error(`Failed to pause workflow: ${error.message}`),
+    });
   };
 
-  const handleResume = async () => {
-    setIsLoading(true);
-    try {
-      await resumeWorkflow(workflowId);
-      toast.success('Workflow resumed successfully');
-      onActionComplete?.();
-    } catch (error) {
-      toast.error(`Failed to resume workflow: ${(error as Error).message}`);
-    } finally {
-      setIsLoading(false);
-    }
+  const handleResume = () => {
+    resumeMutation.mutate(workflowId, {
+      onSuccess: () => toast.success('Workflow resumed successfully'),
+      onError: (error) => toast.error(`Failed to resume workflow: ${error.message}`),
+    });
   };
 
-  const handleCancel = async () => {
-    setIsLoading(true);
-    try {
-      await cancelWorkflow(workflowId);
-      toast.success('Workflow cancelled successfully');
-      setShowCancelDialog(false);
-      onActionComplete?.();
-    } catch (error) {
-      toast.error(`Failed to cancel workflow: ${(error as Error).message}`);
-    } finally {
-      setIsLoading(false);
-    }
+  const handleCancel = () => {
+    cancelMutation.mutate(workflowId, {
+      onSuccess: () => {
+        toast.success('Workflow cancelled successfully');
+        setShowCancelDialog(false);
+      },
+      onError: (error) => toast.error(`Failed to cancel workflow: ${error.message}`),
+    });
   };
 
+  const isLoading = pauseMutation.isPending || resumeMutation.isPending || cancelMutation.isPending;
   const canPause = status === 'running';
   const canResume = status === 'paused';
   const canCancel = status === 'running' || status === 'paused';
@@ -78,7 +65,7 @@ export function WorkflowActions({ workflowId, status, onActionComplete }: Workfl
             disabled={isLoading}
           >
             <Pause className="w-4 h-4 mr-2" />
-            Pause
+            {pauseMutation.isPending ? 'Pausing...' : 'Pause'}
           </Button>
         )}
 
@@ -90,7 +77,7 @@ export function WorkflowActions({ workflowId, status, onActionComplete }: Workfl
             disabled={isLoading}
           >
             <Play className="w-4 h-4 mr-2" />
-            Resume
+            {resumeMutation.isPending ? 'Resuming...' : 'Resume'}
           </Button>
         )}
 
@@ -128,7 +115,7 @@ export function WorkflowActions({ workflowId, status, onActionComplete }: Workfl
               onClick={handleCancel}
               disabled={isLoading}
             >
-              Yes, cancel workflow
+              {cancelMutation.isPending ? 'Cancelling...' : 'Yes, cancel workflow'}
             </Button>
           </DialogFooter>
         </DialogContent>
