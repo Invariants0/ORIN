@@ -1,7 +1,7 @@
 import { Server as HTTPServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
-import { logger } from '../config/logger';
-import { monitoringService } from './monitoring.service';
+import logger from '../config/logger.js';
+import { monitoringService } from './monitoring.service.js';
 
 interface Client {
   id: string;

@@ -1,6 +1,6 @@
 import { EventEmitter } from 'events';
-import { logger } from '../config/logger';
-import { workflowRepository } from './workflow.repository';
+import logger from '../config/logger.js';
+import { workflowRepository } from './workflow.repository.js';
 
 interface WorkflowEvent {
   type: 'workflow_started' | 'workflow_completed' | 'workflow_failed' | 'workflow_paused' | 

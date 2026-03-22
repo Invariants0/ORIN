@@ -1,8 +1,8 @@
-import { logger } from '../config/logger';
-import { workflowRepository } from './workflow.repository';
-import { geminiService } from './gemini.service';
-import { agentService } from './agent.service';
-import { monitoringService } from './monitoring.service';
+import logger from '../config/logger.js';
+import { workflowRepository } from './workflow.repository.js';
+import { geminiService } from './gemini.service.js';
+import { agentService } from './agent.service.js';
+import { monitoringService } from './monitoring.service.js';
 import crypto from 'crypto';
 
 interface StepExecutionContext {

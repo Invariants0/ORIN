@@ -36,7 +36,7 @@ class PromptEngineService {
   constructor() {
     this.genAI = new GoogleGenerativeAI(envVars.GEMINI_API_KEY || '');
     this.model = this.genAI.getGenerativeModel({ 
-      model: 'gemini-2.0-flash-exp',
+      model: 'gemini-2.5-flash', // Updated to stable model
       generationConfig: {
         temperature: this.DEFAULT_TEMPERATURE,
       }
@@ -92,7 +92,7 @@ class PromptEngineService {
           metadata: {
             attempts: attempt + 1,
             processingTimeMs,
-            model: 'gemini-2.0-flash-exp'
+            model: 'gemini-2.5-flash'
           }
         };
 

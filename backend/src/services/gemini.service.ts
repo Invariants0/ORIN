@@ -137,6 +137,32 @@ Provide:
       throw error;
     }
   }
+
+  async generateContent(prompt: string): Promise<any> {
+    try {
+      logger.info("[Gemini] Generating content via prompt engine");
+
+      const response = await promptEngineService.generateStructuredResponse({
+        systemPrompt: 'You are a helpful AI assistant. Provide clear and concise responses.',
+        userInput: prompt,
+        schema: {
+          result: 'string',
+          analysis: 'string'
+        }
+      });
+
+      if (response.status !== 'success') {
+        throw new Error('Failed to generate content');
+      }
+
+      logger.info("[Gemini] Content generated successfully");
+      return response.data;
+
+    } catch (error) {
+      logger.error("[Gemini] Failed to generate content", error);
+      throw error;
+    }
+  }
 }
 
 export const geminiService = new GeminiService();

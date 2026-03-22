@@ -1,6 +1,6 @@
-import { logger } from '../config/logger';
-import { geminiService } from './gemini.service';
-import { sessionService } from './session.service';
+import logger from '../config/logger.js';
+import { geminiService } from './gemini.service.js';
+import { sessionService } from './session.service.js';
 import { taskService } from './task.service';
 import { executionService } from './execution.service';
 

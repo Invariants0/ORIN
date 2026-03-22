@@ -1,6 +1,6 @@
-import { logger } from '../config/logger';
-import { geminiService } from './gemini.service';
-import { agentService } from './agent.service';
+import logger from '../config/logger.js';
+import { geminiService } from './gemini.service.js';
+import { agentService } from './agent.service.js';
 import { taskService } from './task.service';
 import { executionService } from './execution.service';
 import { workflowRepository } from './workflow.repository';
