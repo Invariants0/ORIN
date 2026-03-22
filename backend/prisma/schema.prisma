@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -45,6 +45,7 @@ model Message {
   sessionId String
   role      String // user | assistant
   content   String   @db.Text
+  intent    Stri  content   String  
   intent    String? // STORE | QUERY | GENERATE_DOC | OPERATE | UNCLEAR
   metadata  Json? // Additional metadata (processing time, confidence, etc.)
   createdAt DateTime @default(now())
@@ -60,9 +61,9 @@ model Task {
   id          String   @id @default(cuid())
   sessionId   String
   userId      String
-  goal        String   @db.Text
+  goal        String  
   title       String
-  description String   @db.Text
+  description String  
   status      String   @default("pending") // pending | in_progress | done | cancelled
   priority    String   @default("medium") // high | medium | low
   order       Int      @default(0)
@@ -101,12 +102,12 @@ model DecisionMetrics {
   id             String   @id @default(cuid())
   userId         String
   sessionId      String?
-  input          String   @db.Text
+  input          String  
   strategy       String   // decompose | execute | resume | respond | ask
   confidence     Float
-  reasoning      String   @db.Text
+  reasoning      String  
   success        Boolean  @default(true)
-  userFeedback   String?  @db.Text
+  userFeedback   String? 
   contextFactors Json?    // Array of context factors
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -123,10 +124,10 @@ model Workflow {
   id          String   @id @default(cuid())
   userId      String
   sessionId   String
-  goal        String   @db.Text
+  goal        String  
   status      String   @default("pending") // pending | running | paused | completed | failed
   currentStep String?
-  pauseReason String?  @db.Text
+  pauseReason String? 
   metadata    Json?    // Additional workflow metadata
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -160,7 +161,7 @@ model WorkflowStep {
   maxRetries        Int      @default(3)
   status            String   @default("pending") // pending | running | completed | failed | skipped
   attempts          Int      @default(0)
-  error             String?  @db.Text
+  error             String? 
   output            Json?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
@@ -204,3 +205,89 @@ model WorkflowQueue {
   @@index([priority])
   @@map("workflow_queue")
 }
+
+// Phase 19: Semi-Autonomous System Models
+
+model AutonomyConfig {
+  id                  String   @id @default(cuid())
+  userId              String   @unique
+  level               String   @default("assisted") // manual | assisted | semi_auto | auto
+  confidenceThreshold Int      @default(70)
+  allowedActions      Json     // Array of allowed action types
+  blockedActions      Json     // Array of blocked action types
+  maxRetries          Int      @default(3)
+  pauseThreshold      Float    @default(0.5)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([userId])
+  @@map("autonomy_configs")
+}
+
+model Decision {
+  id              String   @id @default(cuid())
+  userId          String
+  sessionId       String?
+  workflowId      String?
+  action          String   // Action type
+  confidence      Int      // 0-100
+  riskLevel       String   // low | medium | high | critical
+  reasoning       String  
+  dataUsed        Json     // Array of data sources
+  expectedOutcome String  
+  rollbackPlan    String  
+  requiresApproval Boolean @default(false)
+  createdAt       DateTime @default(now())
+
+  executions ActionExecution[]
+
+  @@index([userId])
+  @@index([sessionId])
+  @@index([workflowId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("decisions")
+}
+
+model ActionExecution {
+  id         String    @id @default(cuid())
+  decisionId String
+  status     String    @default("pending") // pending | approved | rejected | executed | failed | undone
+  executedAt DateTime?
+  result     Json?
+  error      String?  
+  undoneAt   DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  decision Decision @relation(fields: [decisionId], references: [id], onDelete: Cascade)
+
+  @@index([decisionId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("action_executions")
+}
+
+model LearningData {
+  id                String   @id @default(cuid())
+  decisionId        String
+  userId            String
+  userApproved      Boolean
+  actionSucceeded   Boolean
+  userIntervened    Boolean
+  performanceImpact Float    // -1.0 to 1.0
+  metadata          Json?    // Additional learning metadata
+  createdAt         DateTime @default(now())
+
+  @@index([decisionId])
+  @@index([userId])
+  @@index([userApproved])
+  @@index([actionSucceeded])
+  @@index([createdAt])
+  @@map("learning_data")
+}
+
+model Policy {
+  id          String   @id @default(cuid())
+  name        String
+  description String  
