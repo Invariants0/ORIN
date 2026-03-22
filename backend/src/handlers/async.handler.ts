@@ -10,4 +10,5 @@ const catchAsync = <P, ResBody, ReqBody, ReqQuery>(
   };
 };
 
+export { catchAsync as asyncHandler };
 export default catchAsync;
