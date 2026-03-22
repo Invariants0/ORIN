@@ -9,6 +9,9 @@ import healthRoutes from "./routes/health.routes.js";
 import chatRoutes from "./routes/chat.routes.js";
 import intentRoutes from "./routes/intent.routes.js";
 import workflowRoutes from "./routes/workflow.routes.js";
+import evolutionRoutes from "./routes/evolution.routes.js";
+import multiAgentRoutes from "./routes/multi-agent.routes.js";
+import autonomyRoutes from "./routes/autonomy.routes.js";
 import { APIError } from "./utils/errors.js";
 
 const app = express();
@@ -38,6 +41,9 @@ app.use("/api", healthRoutes);
 app.use("/api/v1", chatRoutes);
 app.use("/api/v1/intent", intentRoutes);
 app.use("/api/v1/workflows", workflowRoutes);
+app.use("/api/evolution", evolutionRoutes);
+app.use("/api/multi-agent", multiAgentRoutes);
+app.use("/api/autonomy", autonomyRoutes);
 
 // 404 handler
 app.use((req, res) => {
