@@ -37,6 +37,9 @@ class WebSocketClient {
           this.reconnectAttempts = 0;
           this.startHeartbeat();
           
+          // Emit connected event
+          this.handleMessage({ type: 'connected' });
+          
           // Resubscribe to all workflows
           this.subscriptions.forEach((workflowId) => {
             this.send({ type: 'subscribe', workflowId });
@@ -64,6 +67,10 @@ class WebSocketClient {
           console.log('WebSocket disconnected');
           this.isConnecting = false;
           this.stopHeartbeat();
+          
+          // Emit disconnected event
+          this.handleMessage({ type: 'disconnected' });
+          
           this.attemptReconnect();
         };
       } catch (error) {

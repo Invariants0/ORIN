@@ -14,6 +14,14 @@ export interface WorkflowStep {
   metadata?: Record<string, any>;
 }
 
+export interface OptimisticMetadata {
+  type: 'pause' | 'resume' | 'cancel' | 'retry' | 'update';
+  timestamp: number;
+  operationId: string;
+  userId?: string;
+  expiresAt: number;
+}
+
 export interface Workflow {
   id: string;
   name: string;
@@ -27,6 +35,8 @@ export interface Workflow {
   createdAt: Date;
   updatedAt: Date;
   metadata?: Record<string, any>;
+  _optimistic?: OptimisticMetadata; // Enhanced optimistic metadata
+  _optimisticQueue?: OptimisticMetadata[]; // Multiple concurrent operations
 }
 
 export interface SystemMetrics {
