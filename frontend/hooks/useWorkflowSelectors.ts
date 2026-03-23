@@ -4,22 +4,31 @@ import { Workflow, WorkflowStatus } from '@/lib/types/workflow.types';
 
 // Optimized selectors to prevent unnecessary re-renders
 
-export function useWorkflowById(id: string) {
+export function useWorkflowById(id: string): Workflow | undefined {
   return useWorkflowStore((state) => state.workflowsById[id]);
 }
 
-export function useAllWorkflows() {
-  return useWorkflowStore((state) => {
-    const { workflowsById, workflowIds } = state;
-    return workflowIds.map((id) => workflowsById[id]).filter(Boolean);
-  });
+export function useAllWorkflows(): Workflow[] {
+  const workflowIds = useWorkflowStore((state) => state.workflowIds);
+  const workflowsById = useWorkflowStore((state) => state.workflowsById);
+
+  return useMemo(
+    () =>
+      workflowIds
+        .map((id) => workflowsById[id])
+        .filter((w): w is Workflow => Boolean(w)),
+    [workflowIds, workflowsById]
+  );
 }
 
-export function useCurrentWorkflow() {
-  return useWorkflowStore((state) => {
-    const { currentWorkflowId, workflowsById } = state;
-    return currentWorkflowId ? workflowsById[currentWorkflowId] || null : null;
-  });
+export function useCurrentWorkflow(): Workflow | null {
+  const currentWorkflowId = useWorkflowStore((state) => state.currentWorkflowId);
+  const workflowsById = useWorkflowStore((state) => state.workflowsById);
+
+  return useMemo(() => {
+    if (!currentWorkflowId) return null;
+    return workflowsById[currentWorkflowId] ?? null;
+  }, [currentWorkflowId, workflowsById]);
 }
 
 export function useWorkflowsByStatus(status: WorkflowStatus) {

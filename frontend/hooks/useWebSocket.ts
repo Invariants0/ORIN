@@ -13,52 +13,6 @@ export function useWebSocket() {
   const { updateMetrics } = useMetricsStore();
   const { addAlert } = useAlertsStore();
 
-  useEffect(() => {
-    // Connect to WebSocket
-    websocketClient
-      .connect()
-      .then(() => {
-        setIsConnected(true);
-        setError(null);
-      })
-      .catch((err) => {
-        setError(err.message);
-        setIsConnected(false);
-      });
-
-    // Handle connection status
-    const unsubConnected = websocketClient.on('connected', () => {
-      setIsConnected(true);
-      setError(null);
-    });
-
-    // Handle workflow events
-    const unsubWorkflowEvent = websocketClient.on('workflow_event', (message) => {
-      const event: WorkflowEvent = message.event;
-      handleWorkflowEvent(event);
-    });
-
-    // Handle system metrics
-    const unsubMetrics = websocketClient.on('system_metrics', (message) => {
-      const metrics: SystemMetrics = message.metrics;
-      updateMetrics(metrics);
-    });
-
-    // Handle alerts
-    const unsubAlert = websocketClient.on('alert', (message) => {
-      const alert: Alert = message.alert;
-      addAlert(alert);
-    });
-
-    // Cleanup
-    return () => {
-      unsubConnected();
-      unsubWorkflowEvent();
-      unsubMetrics();
-      unsubAlert();
-    };
-  }, []);
-
   const handleWorkflowEvent = useCallback((event: WorkflowEvent) => {
     const { type, workflowId, stepId, data } = event;
 
@@ -117,7 +71,7 @@ export function useWebSocket() {
           updateStep(workflowId, stepId, {
             status: 'failed',
             endTime: new Date(),
-            error: data?.error,
+            error: (data as any)?.error,
           });
         }
         break;
@@ -132,9 +86,55 @@ export function useWebSocket() {
     websocketClient.unsubscribe(workflowId);
   }, []);
 
-  const send = useCallback((message: any) => {
-    websocketClient.send(message);
+  const send = useCallback((message: Record<string, unknown>) => {
+    websocketClient.send(message as any);
   }, []);
+
+  useEffect(() => {
+    // Connect to WebSocket
+    websocketClient
+      .connect()
+      .then(() => {
+        setIsConnected(true);
+        setError(null);
+      })
+      .catch((err) => {
+        setError(err.message);
+        setIsConnected(false);
+      });
+
+    // Handle connection status
+    const unsubConnected = websocketClient.on('connected', () => {
+      setIsConnected(true);
+      setError(null);
+    });
+
+    // Handle workflow events
+    const unsubWorkflowEvent = websocketClient.on('workflow_event', (message) => {
+      const event: WorkflowEvent = message.event;
+      handleWorkflowEvent(event);
+    });
+
+    // Handle system metrics
+    const unsubMetrics = websocketClient.on('system_metrics', (message) => {
+      const metrics: SystemMetrics = message.metrics;
+      updateMetrics(metrics);
+    });
+
+    // Handle alerts
+    const unsubAlert = websocketClient.on('alert', (message) => {
+      const alert: Alert = message.alert;
+      addAlert(alert);
+    });
+
+    // Cleanup
+    return () => {
+      unsubConnected();
+      unsubWorkflowEvent();
+      unsubMetrics();
+      unsubAlert();
+    };
+  }, [addAlert, handleWorkflowEvent, updateMetrics]);
 
   return {
     isConnected,

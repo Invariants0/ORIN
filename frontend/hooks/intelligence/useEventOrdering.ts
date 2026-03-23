@@ -7,10 +7,14 @@ interface EventOrderingConfig {
   gapTimeout?: number; // ms to wait for missing versions
 }
 
+interface OrderableEvent {
+  workflowId: string;
+  [key: string]: unknown;
+}
+
 export function useEventOrdering(config: EventOrderingConfig = {}) {
   const {
     maxQueueSize = 1000,
-    maxRetries = 3,
     gapTimeout = 5000,
   } = config;
 
@@ -48,10 +52,58 @@ export function useEventOrdering(config: EventOrderingConfig = {}) {
     return version === state.lastProcessedVersion + 1;
   }, []);
 
+  // Internal processing function
+  const processEventInternal = useCallback((
+    event: OrderableEvent,
+    version: number,
+    forced: boolean
+  ) => {
+    const workflowId = event.workflowId;
+    const state = versionState.current[workflowId];
+
+    if (!state) return;
+
+    // Update version
+    state.lastProcessedVersion = Math.max(state.lastProcessedVersion, version);
+
+    // Log if forced (gap timeout)
+    if (forced) {
+      console.warn(
+        `Forced processing of event v${version} for workflow ${workflowId}`
+      );
+    }
+
+    // Event will be processed by the caller
+  }, []);
+
+  // Handle gap timeout - process queued events anyway
+  const handleGapTimeout = useCallback((workflowId: string) => {
+    const queue = eventQueue.current[workflowId];
+    if (!queue || queue.length === 0) return;
+
+    console.warn(
+      `Version gap timeout for workflow ${workflowId}. Processing queued events.`
+    );
+
+    // Process all queued events in order
+    queue.forEach(queuedEvent => {
+      processEventInternal(queuedEvent.event as OrderableEvent, queuedEvent.version, true);
+    });
+
+    // Clear queue
+    eventQueue.current[workflowId] = [];
+    
+    const state = versionState.current[workflowId];
+    if (state) {
+      state.hasGaps = false;
+      state.pendingVersions = [];
+    }
+  }, [processEventInternal]);
+
   // Queue event for later processing
   const queueEvent = useCallback((
     workflowId: string,
-    event: any,
+    event: OrderableEvent,
     version: number
   ) => {
     const queue = eventQueue.current[workflowId] || [];
@@ -95,31 +147,7 @@ export function useEventOrdering(config: EventOrderingConfig = {}) {
     gapTimers.current[workflowId] = setTimeout(() => {
       handleGapTimeout(workflowId);
     }, gapTimeout);
-  }, [maxQueueSize, gapTimeout]);
-
-  // Handle gap timeout - process queued events anyway
-  const handleGapTimeout = useCallback((workflowId: string) => {
-    const queue = eventQueue.current[workflowId];
-    if (!queue || queue.length === 0) return;
-
-    console.warn(
-      `Version gap timeout for workflow ${workflowId}. Processing queued events.`
-    );
-
-    // Process all queued events in order
-    queue.forEach(queuedEvent => {
-      processEventInternal(queuedEvent.event, queuedEvent.version, true);
-    });
-
-    // Clear queue
-    eventQueue.current[workflowId] = [];
-    
-    const state = versionState.current[workflowId];
-    if (state) {
-      state.hasGaps = false;
-      state.pendingVersions = [];
-    }
-  }, []);
+  }, [gapTimeout, handleGapTimeout, maxQueueSize]);
 
   // Process queued events that can now be processed
   const processQueuedEvents = useCallback((workflowId: string) => {
@@ -135,7 +163,7 @@ export function useEventOrdering(config: EventOrderingConfig = {}) {
     for (const queuedEvent of queue) {
       if (queuedEvent.version === state.lastProcessedVersion + 1) {
         // Process this event
-        processEventInternal(queuedEvent.event, queuedEvent.version, false);
+        processEventInternal(queuedEvent.event as OrderableEvent, queuedEvent.version, false);
         processed++;
       } else {
         // Keep in queue
@@ -162,37 +190,13 @@ export function useEventOrdering(config: EventOrderingConfig = {}) {
     if (processed > 0) {
       console.log(`Processed ${processed} queued events for workflow ${workflowId}`);
     }
-  }, []);
-
-  // Internal processing function
-  const processEventInternal = useCallback((
-    event: any,
-    version: number,
-    forced: boolean
-  ) => {
-    const workflowId = event.workflowId;
-    const state = versionState.current[workflowId];
-
-    if (!state) return;
-
-    // Update version
-    state.lastProcessedVersion = Math.max(state.lastProcessedVersion, version);
-
-    // Log if forced (gap timeout)
-    if (forced) {
-      console.warn(
-        `Forced processing of event v${version} for workflow ${workflowId}`
-      );
-    }
-
-    // Event will be processed by the caller
-  }, []);
+  }, [processEventInternal]);
 
   // Main event processing function
   const processEvent = useCallback((
-    event: any,
+    event: OrderableEvent,
     version?: number,
-    processor?: (event: any) => void
+    processor?: (event: OrderableEvent) => void
   ): boolean => {
     const workflowId = event.workflowId;
     if (!workflowId) {
@@ -237,8 +241,9 @@ export function useEventOrdering(config: EventOrderingConfig = {}) {
 
     // Queue for later
     queueEvent(workflowId, event, version);
+    const expectedVersion = state ? state.lastProcessedVersion + 1 : 1;
     console.log(
-      `Queued event v${version} for workflow ${workflowId} (expected: v${state.lastProcessedVersion + 1})`
+      `Queued event v${version} for workflow ${workflowId} (expected: v${expectedVersion})`
     );
 
     return false;
