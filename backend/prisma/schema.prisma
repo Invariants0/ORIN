@@ -44,8 +44,7 @@ model Message {
   id        String   @id @default(cuid())
   sessionId String
   role      String // user | assistant
-  content   String   @db.Text
-  intent    Stri  content   String  
+  content   String // long text content
   intent    String? // STORE | QUERY | GENERATE_DOC | OPERATE | UNCLEAR
   metadata  Json? // Additional metadata (processing time, confidence, etc.)
   createdAt DateTime @default(now())
@@ -290,4 +289,5 @@ model LearningData {
 model Policy {
   id          String   @id @default(cuid())
   name        String
-  description String  
+  description String
+}
