@@ -8,6 +8,8 @@ import { useMetricsStore } from '@/stores/metrics.store';
 import { useAlertsStore } from '@/stores/alerts.store';
 import { useWebSocketContext } from '@/providers/websocket-provider';
 import { WorkflowList } from '@/components/workflow/WorkflowList';
+import { Workflow } from '@/lib/types/workflow.types';
+import { SystemMetrics } from '@/lib/types/workflow.types';
 import { MetricsPanel } from '@/components/metrics/MetricsPanel';
 import { ExecutionTimeChart } from '@/components/charts/ExecutionTimeChart';
 import { WorkflowStatusChart } from '@/components/charts/WorkflowStatusChart';
@@ -19,6 +21,21 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { RefreshCw, Home } from 'lucide-react';
 import Link from 'next/link';
+
+function isSystemMetrics(value: unknown): value is SystemMetrics {
+  if (!value || typeof value !== 'object') return false;
+
+  const candidate = value as Record<string, unknown>;
+  return (
+    typeof candidate.activeWorkflows === 'number' &&
+    typeof candidate.completedWorkflows === 'number' &&
+    typeof candidate.failedWorkflows === 'number' &&
+    typeof candidate.queueSize === 'number' &&
+    typeof candidate.averageExecutionTime === 'number' &&
+    typeof candidate.successRate === 'number' &&
+    typeof candidate.failureRate === 'number'
+  );
+}
 
 export default function WorkflowsPage() {
   const router = useRouter();
@@ -33,13 +50,17 @@ export default function WorkflowsPage() {
   const { alerts, removeAlert, acknowledgeAlert, clearAlerts } = useAlertsStore();
   
   // WebSocket connection
-  const { isConnected } = useWebSocketContext();
+  useWebSocketContext();
 
   // Use workflows from Zustand if available (realtime), otherwise from React Query
-  const displayWorkflows = workflows.length > 0 ? workflows : workflowsData;
-  const displayMetrics = metricsData || useMetricsStore.getState().metrics;
+  const displayWorkflows = Array.isArray(workflows) && workflows.length > 0
+    ? workflows
+    : (Array.isArray(workflowsData) ? workflowsData : []);
+  const displayMetrics = isSystemMetrics(metricsData)
+    ? metricsData
+    : useMetricsStore.getState().metrics;
 
-  const handleWorkflowClick = (workflow: any) => {
+  const handleWorkflowClick = (workflow: Workflow) => {
     router.push(`/workflows/${workflow.id}`);
   };
 

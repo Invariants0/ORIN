@@ -8,10 +8,19 @@ interface ExecutionTimeChartProps {
 }
 
 export function ExecutionTimeChart({ history }: ExecutionTimeChartProps) {
-  const data = history.map((m) => ({
-    time: format(new Date(m.timestamp), 'HH:mm:ss'),
-    avgTime: Math.round(m.averageExecutionTime / 1000), // Convert to seconds
-  }));
+  const data = history
+    .map((m) => {
+      const timestamp = m.timestamp instanceof Date ? m.timestamp : new Date(m.timestamp);
+      if (Number.isNaN(timestamp.getTime())) {
+        return null;
+      }
+
+      return {
+        time: format(timestamp, 'HH:mm:ss'),
+        avgTime: Math.round(m.averageExecutionTime / 1000), // Convert to seconds
+      };
+    })
+    .filter((point): point is { time: string; avgTime: number } => point !== null);
 
   return (
     <Card className="p-6">

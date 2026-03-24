@@ -1,5 +1,17 @@
 import { API_URL } from "@/lib/constants";
 
+function unwrapApiData<T>(payload: unknown): T {
+  if (
+    payload &&
+    typeof payload === "object" &&
+    "data" in payload
+  ) {
+    return (payload as { data: T }).data;
+  }
+
+  return payload as T;
+}
+
 export async function storeContent(input: string) {
   const response = await fetch(`${API_URL}/store`, {
     method: "POST",
@@ -60,7 +72,9 @@ export async function getWorkflows() {
     throw new Error(error.message || "Failed to fetch workflows");
   }
 
-  return response.json();
+  const payload = await response.json();
+  const data = unwrapApiData<unknown>(payload);
+  return Array.isArray(data) ? data : [];
 }
 
 export async function getWorkflowById(id: string) {
@@ -71,7 +85,8 @@ export async function getWorkflowById(id: string) {
     throw new Error(error.message || "Failed to fetch workflow");
   }
 
-  return response.json();
+  const payload = await response.json();
+  return unwrapApiData(payload);
 }
 
 export async function getWorkflowStatistics() {
@@ -82,7 +97,8 @@ export async function getWorkflowStatistics() {
     throw new Error(error.message || "Failed to fetch statistics");
   }
 
-  return response.json();
+  const payload = await response.json();
+  return unwrapApiData(payload);
 }
 
 export async function getWorkflowMetrics() {
@@ -93,7 +109,8 @@ export async function getWorkflowMetrics() {
     throw new Error(error.message || "Failed to fetch metrics");
   }
 
-  return response.json();
+  const payload = await response.json();
+  return unwrapApiData(payload);
 }
 
 export async function getAlerts() {
@@ -104,7 +121,8 @@ export async function getAlerts() {
     throw new Error(error.message || "Failed to fetch alerts");
   }
 
-  return response.json();
+  const payload = await response.json();
+  return unwrapApiData(payload);
 }
 
 export async function clearAlerts() {
@@ -117,7 +135,8 @@ export async function clearAlerts() {
     throw new Error(error.message || "Failed to clear alerts");
   }
 
-  return response.json();
+  const payload = await response.json();
+  return unwrapApiData(payload);
 }
 
 export async function pauseWorkflow(id: string) {
@@ -130,7 +149,8 @@ export async function pauseWorkflow(id: string) {
     throw new Error(error.message || "Failed to pause workflow");
   }
 
-  return response.json();
+  const payload = await response.json();
+  return unwrapApiData(payload);
 }
 
 export async function resumeWorkflow(id: string) {
@@ -143,7 +163,8 @@ export async function resumeWorkflow(id: string) {
     throw new Error(error.message || "Failed to resume workflow");
   }
 
-  return response.json();
+  const payload = await response.json();
+  return unwrapApiData(payload);
 }
 
 export async function cancelWorkflow(id: string) {
@@ -156,5 +177,6 @@ export async function cancelWorkflow(id: string) {
     throw new Error(error.message || "Failed to cancel workflow");
   }
 
-  return response.json();
+  const payload = await response.json();
+  return unwrapApiData(payload);
 }

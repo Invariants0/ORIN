@@ -14,7 +14,7 @@ export const workflowKeys = {
 
 // Queries
 export function useWorkflows() {
-  return useQuery({
+  return useQuery<Workflow[]>({
     queryKey: workflowKeys.lists(),
     queryFn: api.getWorkflows,
   });

@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useWorkflowStore } from '@/stores/workflow.store';
 import { useWebSocketContext } from '@/providers/websocket-provider';
 import { useWorkflow } from '@/hooks/queries/useWorkflowQueries';
 import { useCurrentWorkflow } from '@/hooks/useWorkflowSelectors';
 import { StepList } from '@/components/workflow/StepList';
+import { WorkflowStep } from '@/lib/types/workflow.types';
 import { WorkflowActions } from '@/components/workflow/WorkflowActions';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -37,7 +38,7 @@ export default function WorkflowDetailPage() {
       unsubscribe(workflowId);
       setCurrentWorkflowId(null);
     };
-  }, [workflowId]);
+  }, [workflowId, setCurrentWorkflowId, subscribe, unsubscribe]);
 
   // Use workflow from React Query or Zustand (whichever is available)
   const displayWorkflow = workflow || currentWorkflow;
@@ -68,7 +69,7 @@ export default function WorkflowDetailPage() {
     );
   }
 
-  const completedSteps = displayWorkflow.steps.filter((s: any) => s.status === 'completed').length;
+  const completedSteps = displayWorkflow.steps.filter((s: WorkflowStep) => s.status === 'completed').length;
   const totalSteps = displayWorkflow.steps.length;
 
   return (
