@@ -21,7 +21,11 @@ export const sendMessage = catchAsync(async (req: Request, res: Response) => {
   }
 
   // Extract userId from auth (placeholder for now - will be replaced with real auth)
+  // For demo purposes, ensure anonymous user exists
   const userId = (req as any).user?.id || 'anonymous';
+  
+  // Ensure user exists in database
+  await sessionService.ensureUserExists(userId);
 
   logger.info('[Chat Controller] Processing message', { 
     userId, 
