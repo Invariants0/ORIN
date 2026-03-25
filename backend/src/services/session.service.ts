@@ -38,6 +38,34 @@ export interface SessionWithMessages {
 
 class SessionService {
   /**
+   * Ensure user exists in database (for demo/testing)
+   */
+  async ensureUserExists(userId: string): Promise<void> {
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: userId }
+      });
+
+      if (!user) {
+        logger.info('[Session] Creating demo user', { userId });
+        await prisma.user.create({
+          data: {
+            id: userId,
+            email: `${userId}@demo.orin.ai`,
+            name: userId === 'anonymous' ? 'Demo User' : userId
+          }
+        });
+      }
+    } catch (error: any) {
+      logger.error('[Session] Failed to ensure user exists', { 
+        error: error.message,
+        userId 
+      });
+      throw error;
+    }
+  }
+
+  /**
    * Create a new chat session
    */
   async createSession(input: CreateSessionInput): Promise<SessionWithMessages> {

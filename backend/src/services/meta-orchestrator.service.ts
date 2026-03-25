@@ -183,18 +183,21 @@ class MetaOrchestratorService {
 
     const input = context.input.toLowerCase();
 
-    // DECOMPOSE scoring
-    if (this.isGoalInput(input)) {
+    // DECOMPOSE scoring (but not if it's a store/query request)
+    const isExplicitStore = this.isStoreRequest(input);
+    const isExplicitQuery = this.isQueryRequest(input);
+    
+    if (this.isGoalInput(input) && !isExplicitStore && !isExplicitQuery) {
       scores[StrategyType.DECOMPOSE].score += 40;
       scores[StrategyType.DECOMPOSE].reasons.push('Input looks like a goal/project');
     }
 
-    if (context.hasSession && !context.hasTasks) {
+    if (context.hasSession && !context.hasTasks && !isExplicitStore && !isExplicitQuery) {
       scores[StrategyType.DECOMPOSE].score += 20;
       scores[StrategyType.DECOMPOSE].reasons.push('Session exists but no tasks yet');
     }
 
-    if (input.length > 30 && input.length < 300) {
+    if (input.length > 30 && input.length < 300 && !isExplicitStore && !isExplicitQuery) {
       scores[StrategyType.DECOMPOSE].score += 10;
       scores[StrategyType.DECOMPOSE].reasons.push('Input length suitable for goal');
     }
@@ -238,7 +241,7 @@ class MetaOrchestratorService {
     }
 
     if (this.isStoreRequest(input)) {
-      scores[StrategyType.RESPOND].score += 35;
+      scores[StrategyType.RESPOND].score += 70; // Increased from 50 to prioritize store requests
       scores[StrategyType.RESPOND].reasons.push('Input is a store/save request');
     }
 

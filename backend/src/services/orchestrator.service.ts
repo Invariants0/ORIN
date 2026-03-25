@@ -98,26 +98,30 @@ class OrchestratorService {
       }
 
       // Fallback to intent-based routing for RESPOND strategy
+      // Only check for special patterns if meta-orchestrator didn't explicitly choose RESPOND
+      const metaChoseRespond = decision.strategy === StrategyType.RESPOND;
+      
       // Check if this is a resume request
-      if (resumeService.isResumeRequest(input)) {
+      if (!metaChoseRespond && resumeService.isResumeRequest(input)) {
         logger.info('[Orchestrator] Resume request detected');
         return await this.handleResumeRequest(userId, sessionId, servicesUsed, startTime);
       }
 
       // Check if this is a task execution request
-      if (executionService.isExecutionRequest(input) && sessionId) {
+      if (!metaChoseRespond && executionService.isExecutionRequest(input) && sessionId) {
         logger.info('[Orchestrator] Task execution request detected');
         return await this.handleTaskExecution(userId, sessionId, servicesUsed, startTime);
       }
 
       // Check if this is a task completion request
-      if (executionService.isCompletionRequest(input) && sessionId) {
+      if (!metaChoseRespond && executionService.isCompletionRequest(input) && sessionId) {
         logger.info('[Orchestrator] Task completion request detected');
         return await this.handleTaskCompletion(userId, sessionId, servicesUsed, startTime);
       }
 
       // Check if this is a goal that should be decomposed into tasks
-      if (taskService.isGoalInput(input) && sessionId) {
+      // Skip this check if meta-orchestrator explicitly chose RESPOND (e.g., for store/query requests)
+      if (!metaChoseRespond && taskService.isGoalInput(input) && sessionId) {
         logger.info('[Orchestrator] Goal input detected, checking for task decomposition');
         const shouldDecompose = await this.shouldDecomposeIntoTasks(input);
         
