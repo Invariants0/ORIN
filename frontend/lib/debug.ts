@@ -1,110 +1,84 @@
-// Debug utilities for testing and development
+/**
+ * Debug utilities for testing and development.
+ * Automatically respects the deployment environment.
+ */
+
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 
 class DebugManager {
-  private enabled = false;
+  private enabled = !IS_PRODUCTION;
 
+  /**
+   * Manually enable debug mode via console: `window.debug.enable()`
+   */
   enable() {
     this.enabled = true;
-    console.log('🐛 Debug mode enabled');
+    console.log('🐛 [DEBUG] mode manually enabled');
   }
 
+  /**
+   * Manually disable debug mode.
+   */
   disable() {
     this.enabled = false;
-    console.log('🐛 Debug mode disabled');
+    console.log('🐛 [DEBUG] mode manually disabled');
   }
 
   isEnabled() {
     return this.enabled;
   }
 
+  /**
+   * Performance-conscious logging that only executes when debug is enabled.
+   */
   log(...args: any[]) {
     if (this.enabled) {
       console.log('[DEBUG]', ...args);
     }
   }
 
-  // Simulate WebSocket disconnect
-  simulateDisconnect(websocketClient: any, duration = 5000) {
+  /**
+   * Measure the execution time of a specific block.
+   */
+  measure(label: string, callback: () => void) {
     if (!this.enabled) {
-      console.warn('Enable debug mode first: window.debug.enable()');
-      return;
-    }
-
-    console.log('🔌 Simulating disconnect for', duration, 'ms');
-    websocketClient.disconnect();
-
-    setTimeout(() => {
-      console.log('🔌 Reconnecting...');
-      websocketClient.connect();
-    }, duration);
-  }
-
-  // Simulate delayed events
-  simulateDelayedEvent(callback: () => void, delay = 3000) {
-    if (!this.enabled) {
-      console.warn('Enable debug mode first: window.debug.enable()');
-      return;
-    }
-
-    console.log('⏱️ Simulating delayed event:', delay, 'ms');
-    setTimeout(() => {
-      console.log('⏱️ Executing delayed event');
       callback();
-    }, delay);
-  }
-
-  // Log query cache state
-  logQueryCache(queryClient: any) {
-    if (!this.enabled) {
-      console.warn('Enable debug mode first: window.debug.enable()');
       return;
     }
+    console.time(`⚡ [PERF] ${label}`);
+    callback();
+    console.timeEnd(`⚡ [PERF] ${label}`);
+  }
 
-    const cache = queryClient.getQueryCache();
-    const queries = cache.getAll();
-
-    console.group('📦 Query Cache State');
-    queries.forEach((query: any) => {
+  /**
+   * Monitor the Query Cache state for React-Query.
+   */
+  logQueryCache(queryClient: any) {
+    if (!this.enabled) return;
+    const queries = queryClient.getQueryCache().getAll();
+    console.group('📦 [DEBUG] Query Cache State');
+    queries.forEach((q: any) => {
       console.log({
-        queryKey: query.queryKey,
-        state: query.state.status,
-        dataUpdatedAt: new Date(query.state.dataUpdatedAt),
-        data: query.state.data,
+        key: q.queryKey,
+        status: q.state.status,
+        updated: new Date(q.state.dataUpdatedAt).toLocaleTimeString(),
+        data: q.state.data,
       });
     });
     console.groupEnd();
   }
 
-  // Log Zustand store state
-  logStoreState(store: any) {
-    if (!this.enabled) {
-      console.warn('Enable debug mode first: window.debug.enable()');
-      return;
-    }
-
-    console.group('🏪 Store State');
-    console.log(store.getState());
-    console.groupEnd();
-  }
-
-  // Measure render performance
-  measureRender(componentName: string, callback: () => void) {
-    if (!this.enabled) {
-      callback();
-      return;
-    }
-
-    const start = performance.now();
-    callback();
-    const end = performance.now();
-
-    console.log(`⚡ ${componentName} render time:`, (end - start).toFixed(2), 'ms');
+  /**
+   * Monitor external store states (Zustand).
+   */
+  logStore(name: string, store: any) {
+    if (!this.enabled) return;
+    console.log(`🏪 [DEBUG] Store [${name}]:`, store.getState());
   }
 }
 
 export const debug = new DebugManager();
 
-// Expose to window for browser console access
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && !IS_PRODUCTION) {
   (window as any).debug = debug;
 }
