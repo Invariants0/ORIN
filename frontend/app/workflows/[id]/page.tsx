@@ -6,22 +6,22 @@ import { useWorkflowStore } from '@/stores/workflow.store';
 import { useWebSocketContext } from '@/providers/websocket-provider';
 import { useWorkflow } from '@/hooks/queries/useWorkflowQueries';
 import { useCurrentWorkflow } from '@/hooks/useWorkflowSelectors';
-import { StepList } from '@/components/workflow/StepList';
-import { WorkflowStep } from '@/lib/types/workflow.types';
-import { WorkflowActions } from '@/components/workflow/WorkflowActions';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
+import { StepList } from '@/components/features/workflow/StepList';
+import { Workflow, WorkflowStep } from '@/lib/types/workflow.types';
+import { WorkflowActions } from '@/components/features/workflow/WorkflowActions';
+import { Button } from '@/components/core/brand/Button';
+import { Card } from '@/components/core/brand/Card';
+import { BrandBadge as Badge } from '@/components/core/brand/Badge';
+import { BrandProgress as Progress } from '@/components/core/brand/Progress';
 import { ArrowLeft, Clock, Calendar } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
-import { ErrorBoundary } from '@/components/errors/ErrorBoundary';
+import { ErrorBoundary } from '@/components/core/ErrorBoundary';
 
 export default function WorkflowDetailPage() {
   const params = useParams();
   const router = useRouter();
   const workflowId = params.id as string;
-  
+
   const { setCurrentWorkflowId } = useWorkflowStore();
   const currentWorkflow = useCurrentWorkflow();
   const { data: workflow, isLoading, error } = useWorkflow(workflowId);
@@ -30,7 +30,7 @@ export default function WorkflowDetailPage() {
   useEffect(() => {
     // Set current workflow ID in store
     setCurrentWorkflowId(workflowId);
-    
+
     // Subscribe to real-time updates
     subscribe(workflowId);
 
@@ -41,7 +41,7 @@ export default function WorkflowDetailPage() {
   }, [workflowId, setCurrentWorkflowId, subscribe, unsubscribe]);
 
   // Use workflow from React Query or Zustand (whichever is available)
-  const displayWorkflow = workflow || currentWorkflow;
+  const displayWorkflow = (workflow || currentWorkflow) as Workflow | null;
 
   if (isLoading) {
     return (
@@ -81,7 +81,7 @@ export default function WorkflowDetailPage() {
             <div className="flex items-center gap-4 mb-4">
               <Button
                 variant="ghost"
-                size="icon"
+                size="sm"
                 onClick={() => router.push('/workflows')}
               >
                 <ArrowLeft className="w-5 h-5" />
@@ -94,7 +94,7 @@ export default function WorkflowDetailPage() {
                   </p>
                 )}
               </div>
-              <Badge variant={isConnected ? 'default' : 'destructive'}>
+              <Badge variant={isConnected ? 'sage' : 'black'}>
                 {isConnected ? 'Live' : 'Offline'}
               </Badge>
             </div>
@@ -106,7 +106,7 @@ export default function WorkflowDetailPage() {
                   <span className="text-muted-foreground">Created:</span>
                   <span>{format(new Date(displayWorkflow.createdAt), 'PPp')}</span>
                 </div>
-                
+
                 {displayWorkflow.startTime && (
                   <div className="flex items-center gap-2">
                     <Clock className="w-4 h-4 text-muted-foreground" />
@@ -139,7 +139,7 @@ export default function WorkflowDetailPage() {
             {/* Progress Card */}
             <Card className="p-6 lg:col-span-1">
               <h3 className="font-semibold mb-4">Progress</h3>
-              
+
               <div className="space-y-4">
                 <div>
                   <div className="flex items-center justify-between mb-2">
