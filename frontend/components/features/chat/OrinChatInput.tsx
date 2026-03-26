@@ -2,9 +2,12 @@
 
 import React, { useState, useRef, useEffect, useImperativeHandle } from 'react';
 import { useOrinStore, CommandStep } from '@/stores/useOrinStore';
-import { Send, FileText, Search, Pickaxe, Play, Command, Zap } from 'lucide-react';
+import { Send, FileText, Search, Pickaxe, Play, Command, Zap, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
+import { ChatApi } from '@/lib/api/endpoints/chat.api';
+
+// ── Static command metadata (UI only) ────────────────────────────────
 
 const SLASH_COMMANDS = [
   { cmd: '/store',   desc: 'Extract URL or save text to Notion',       icon: FileText, color: 'bg-[#b7c6c2]' },
@@ -13,55 +16,121 @@ const SLASH_COMMANDS = [
   { cmd: '/execute', desc: 'Execute a defined workflow step',           icon: Play,     color: 'bg-[#ffe17c]' },
 ];
 
-const STEP_LABELS: Record<string, string[]> = {
-  '/store':   ['Resolving intent and extracting content','Classifying content type and tags','Deduplication check against Notion','Writing to Notion Inbox database','Indexing for future retrieval'],
-  '/analyze': ['Scanning Notion workspace structure','Running semantic similarity analysis','Detecting duplicate and orphaned pages','Generating structural insights report','Building knowledge graph connections'],
-  '/build':   ['Parsing idea structure and intent','Mapping to Notion database schema','Creating parent page hierarchy','Generating sub-pages and properties','Linking cross-references in workspace'],
-  '/execute': ['Initialising workflow step pipeline','Resolving context and parameters','Running execution engine','Validating step outputs','Persisting results to session store'],
-};
+const SLASH_SET = new Set(SLASH_COMMANDS.map((c) => c.cmd));
 
-const AI_CONTENT: Record<string, { content: string; refs: string[] }> = {
-  '/store':   { content: "Content captured and stored in your Notion Inbox under 'AI Processed'. Duplicate check passed — this is a new entry.", refs: ['Notion_Inbox', 'AI_Processed'] },
-  '/analyze': { content: "Analysis complete. Found 12 databases and 47 pages. Key issues: 3 duplicates, 8 orphaned pages.", refs: ['Memory_Graph', 'Duplicate_Report'] },
-  '/build':   { content: "Hierarchy constructed. Created 4 parent pages, 2 databases, and 1 linked view.", refs: ['Notion_Hierarchy', 'Created_Pages'] },
-  '/execute': { content: "Workflow execution complete. Step 3/3 — all outputs saved to session store.", refs: ['Workflow_Log'] },
-};
-
-const MODE_CONTENT: Record<string, { content: string; refs: string[] }> = {
-  explore:  { content: "Based on your Notion workspace, I found 3 related documents on that topic.", refs: ['Research_Notes', 'AI_Trends_2026'] },
-  build:    { content: "Done! I've created a new document in your Notion 'Documents' database.", refs: ['Created_Doc_v1'] },
-  capture:  { content: "Memory captured! Saved to your Notion 'Inbox' under 'Brain Dump'.", refs: ['Notion_Inbox'] },
-};
+// ── Props ─────────────────────────────────────────────────────────────
 
 interface OrinChatInputProps {
   prefillRef?: React.MutableRefObject<((text: string) => void) | null>;
 }
+
+// ── Component ─────────────────────────────────────────────────────────
 
 export const OrinChatInput = ({ prefillRef }: OrinChatInputProps) => {
   const [input, setInput] = useState('');
   const [showSlash, setShowSlash] = useState(false);
   const [slashQuery, setSlashQuery] = useState('');
   const [highlighted, setHighlighted] = useState(0);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const { mode, addMessage, updateMessage, setLoading, loadingStates } = useOrinStore();
 
-  // Expose prefill to parent (suggestion clicks)
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const { mode, addMessage, updateMessage, setLoading, loadingStates, currentSessionId, setSession } = useOrinStore();
+
+  // ── Prefill handle (suggestion clicks) ────────────────────────────
   useImperativeHandle(prefillRef as any, () => (text: string) => {
     setInput(text);
     setShowSlash(false);
     textareaRef.current?.focus();
   }, []);
 
-  const filteredCmds = SLASH_COMMANDS.filter(
-    (c) => slashQuery === '/' || c.cmd.startsWith(slashQuery.toLowerCase())
-  );
-
+  // ── Auto-resize textarea ──────────────────────────────────────────
   useEffect(() => {
     const ta = textareaRef.current;
     if (!ta) return;
     ta.style.height = 'auto';
     ta.style.height = `${Math.min(ta.scrollHeight, 120)}px`;
   }, [input]);
+
+  // ── Send handler ──────────────────────────────────────────────────
+  const handleSend = async () => {
+    const trimmed = input.trim();
+    if (!trimmed || loadingStates.sendingMessage) return;
+
+    const [firstWord, ...rest] = trimmed.split(' ');
+    const isSlashCommand = firstWord.startsWith('/') && SLASH_SET.has(firstWord);
+
+    // 1. Add user message immediately
+    addMessage({
+      id: `u-${Date.now()}`,
+      role: 'user',
+      content: trimmed,
+      timestamp: Date.now(),
+      command: isSlashCommand ? firstWord : undefined,
+      commandArgs: isSlashCommand && rest.length ? rest.join(' ') : undefined,
+    });
+
+    setInput('');
+    setShowSlash(false);
+    setLoading('sendingMessage', true);
+
+    const assistantMsgId = `a-${Date.now()}`;
+    
+    // 2. Add optimistic assistant bubble
+    addMessage({
+      id: assistantMsgId,
+      role: 'assistant',
+      content: '',
+      timestamp: Date.now(),
+      command: isSlashCommand ? firstWord : undefined,
+      commandSteps: [{ label: 'Processing...', status: 'running' }],
+      isStreaming: true,
+    });
+
+    try {
+      // 3. Call ChatApi orchestrator
+      const response = await ChatApi.sendMessage({
+        message: trimmed,
+        sessionId: currentSessionId
+      });
+
+      // Update Session ID if it's new
+      if (response.isNewSession) {
+        setSession(response.sessionId);
+      }
+
+      // Map backend actions to visual CommandSteps
+      const formattedSteps: CommandStep[] = (response.actions || []).map(a => ({
+        label: `${a.type}: ${JSON.stringify(a.details)}`,
+        status: a.status === 'completed' ? 'done' : 'failed'
+      }));
+
+      // 4. Update Assistant Bubble with real Orchestrator result
+      updateMessage(assistantMsgId, {
+        content: response.output,
+        references: response.references || [],
+        commandSteps: formattedSteps.length > 0 ? formattedSteps : undefined,
+        metadata: {
+          intent: response.intent,
+          confidence: response.metadata.confidence,
+          processingTimeMs: response.metadata.processingTimeMs
+        },
+        isStreaming: false,
+      });
+
+    } catch (err: any) {
+      updateMessage(assistantMsgId, {
+        content: `⚠️ Orchestrator Error: ${err?.message ?? 'Failed to process message'}`,
+        commandSteps: [{ label: 'Execution Failed', status: 'failed' }],
+        isStreaming: false,
+      });
+    } finally {
+      setLoading('sendingMessage', false);
+    }
+  };
+
+  // ── Keyboard & change handlers ────────────────────────────────────
+  const filteredCmds = SLASH_COMMANDS.filter(
+    (c) => slashQuery === '/' || c.cmd.startsWith(slashQuery.toLowerCase())
+  );
 
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value;
@@ -80,90 +149,6 @@ export const OrinChatInput = ({ prefillRef }: OrinChatInputProps) => {
     textareaRef.current?.focus();
   };
 
-  const handleSend = () => {
-    const trimmed = input.trim();
-    if (!trimmed || loadingStates.sendingMessage) return;
-
-    const [firstWord, ...rest] = trimmed.split(' ');
-    const isSlash = firstWord.startsWith('/') && STEP_LABELS[firstWord];
-
-    // Add user message
-    addMessage({
-      id: `u-${Date.now()}`,
-      role: 'user',
-      content: trimmed,
-      timestamp: Date.now(),
-      command: isSlash ? firstWord : undefined,
-      commandArgs: isSlash && rest.length ? rest.join(' ') : undefined,
-    });
-
-    setInput('');
-    setShowSlash(false);
-    setLoading('sendingMessage', true);
-
-    if (isSlash) {
-      // Add assistant message with empty steps immediately
-      const assistantId = `a-${Date.now()}`;
-      const stepLabels = STEP_LABELS[firstWord];
-      const initialSteps: CommandStep[] = stepLabels.map((label) => ({
-        label,
-        status: 'pending',
-      }));
-
-      addMessage({
-        id: assistantId,
-        role: 'assistant',
-        content: '',
-        timestamp: Date.now(),
-        commandSteps: initialSteps,
-        isStreaming: true,
-      });
-
-      // Animate steps
-      let stepIdx = 0;
-      const advance = () => {
-        if (stepIdx >= stepLabels.length) {
-          // All done
-          const out = AI_CONTENT[firstWord];
-          updateMessage(assistantId, {
-            content: out.content,
-            references: out.refs,
-            isStreaming: false,
-            commandSteps: stepLabels.map((label) => ({ label, status: 'done' as const })),
-          });
-          setLoading('sendingMessage', false);
-          return;
-        }
-        const idx = stepIdx++;
-        const dur = 500 + Math.random() * 600;
-
-        updateMessage(assistantId, {
-          commandSteps: stepLabels.map((label, i) => ({
-            label,
-            status: i < idx ? 'done' : i === idx ? 'running' : 'pending',
-          })),
-        });
-
-        setTimeout(advance, dur);
-      };
-
-      setTimeout(advance, 300);
-    } else {
-      // Regular AI response
-      setTimeout(() => {
-        const out = MODE_CONTENT[mode] ?? MODE_CONTENT.explore;
-        addMessage({
-          id: `a-${Date.now()}`,
-          role: 'assistant',
-          content: out.content,
-          timestamp: Date.now(),
-          references: out.refs,
-        });
-        setLoading('sendingMessage', false);
-      }, 1400);
-    }
-  };
-
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (showSlash && filteredCmds.length > 0) {
       if (e.key === 'ArrowDown') { e.preventDefault(); setHighlighted((i) => (i + 1) % filteredCmds.length); return; }
@@ -179,10 +164,13 @@ export const OrinChatInput = ({ prefillRef }: OrinChatInputProps) => {
     mode === 'capture' ? 'Dump your thoughts... or / for commands' :
     'Ask anything... or / for commands';
 
+  const isSending = loadingStates.sendingMessage;
+
+  // ── Render ─────────────────────────────────────────────────────────
   return (
     <div className="absolute bottom-0 left-0 right-0 px-6 pb-5 z-30 pointer-events-none">
       <div className="max-w-3xl mx-auto pointer-events-auto">
-        {/* Slash popup */}
+        {/* Slash command popup */}
         <AnimatePresence>
           {showSlash && filteredCmds.length > 0 && (
             <motion.div
@@ -231,7 +219,7 @@ export const OrinChatInput = ({ prefillRef }: OrinChatInputProps) => {
 
         {/* Floating input bar */}
         <div className="bg-white border-2 border-black rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.12)] overflow-hidden">
-          {/* command chip bar when command selected */}
+          {/* Command chip */}
           {input.startsWith('/') && input.includes(' ') && (
             <div className="px-4 pt-3 pb-0">
               <span className="inline-flex items-center gap-1 bg-black text-[#ffe17c] font-mono text-[10px] font-bold px-2 py-0.5 rounded">
@@ -248,20 +236,23 @@ export const OrinChatInput = ({ prefillRef }: OrinChatInputProps) => {
               value={input}
               onChange={handleChange}
               onKeyDown={handleKeyDown}
-              placeholder={placeholder}
-              className="flex-1 bg-transparent text-sm font-medium text-black placeholder:text-black/30 focus:outline-none resize-none leading-relaxed"
+              placeholder={isSending ? 'Orchestrating request...' : placeholder}
+              disabled={isSending}
+              className="flex-1 bg-transparent text-sm font-medium text-black placeholder:text-black/30 focus:outline-none resize-none leading-relaxed disabled:opacity-60"
             />
             <button
               onClick={handleSend}
-              disabled={!input.trim() || loadingStates.sendingMessage}
+              disabled={!input.trim() || isSending}
               className={cn(
                 'w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-xl border-2 border-black transition-all',
-                input.trim() && !loadingStates.sendingMessage
+                input.trim() && !isSending
                   ? mode === 'build' ? 'bg-[#ffe17c] hover:shadow-[2px_2px_0px_0px_#000]' : 'bg-black text-white hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,0.3)]'
                   : 'bg-neutral-100 text-black/30 border-black/10 cursor-not-allowed'
               )}
             >
-              <Send className="w-4 h-4" />
+              {isSending
+                ? <Loader2 className="w-4 h-4 animate-spin" />
+                : <Send className="w-4 h-4" />}
             </button>
           </div>
 
@@ -274,8 +265,14 @@ export const OrinChatInput = ({ prefillRef }: OrinChatInputProps) => {
               <Command className="w-3 h-3" /> commands
             </button>
             <span className="flex items-center gap-1 text-[10px] font-mono text-black/20">
-              <Zap className="w-3 h-3" /> gemini-1.5-pro
+              <Zap className="w-3 h-3" /> orin-orchestrator
             </span>
+            {isSending && (
+              <span className="flex items-center gap-1 text-[10px] font-mono text-[#b7c6c2] font-bold">
+                <span className="w-1.5 h-1.5 bg-[#b7c6c2] rounded-full animate-pulse" />
+                Processing
+              </span>
+            )}
             <span className="ml-auto text-[9px] font-mono text-black/20">Shift+Enter for new line</span>
           </div>
         </div>
