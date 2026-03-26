@@ -1,17 +1,27 @@
 import { useQuery } from '@tanstack/react-query';
-import * as api from '@/lib/api';
+import { MetricsApi } from '@/lib/api/endpoints/metrics.api';
+import { queryKeys } from './query-keys';
 
-// Query keys
-export const metricsKeys = {
-  all: ['metrics'] as const,
-  current: () => [...metricsKeys.all, 'current'] as const,
-};
-
-// Queries
+/**
+ * Fetch core system performance metrics.
+ * Configured with active polling for real-time visual updates.
+ */
 export function useMetrics() {
   return useQuery({
-    queryKey: metricsKeys.current(),
-    queryFn: api.getWorkflowMetrics,
-    refetchInterval: 5000, // Refetch every 5 seconds for metrics
+    queryKey: queryKeys.workflows.metrics(),
+    queryFn: () => MetricsApi.getMetrics(),
+    refetchInterval: 5000, 
+    staleTime: 2000,
+  });
+}
+
+/**
+ * Fetch high-level workflow statistics (totals, averages).
+ */
+export function useWorkflowStatistics() {
+  return useQuery({
+    queryKey: queryKeys.workflows.statistics(),
+    queryFn: () => MetricsApi.getStatistics(),
+    staleTime: 10 * 1000,
   });
 }

@@ -1,28 +1,34 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import * as api from '@/lib/api';
+import { MetricsApi } from '@/lib/api/endpoints/metrics.api';
+import { queryKeys } from './query-keys';
+import { toast } from 'sonner';
 
-// Query keys
-export const alertsKeys = {
-  all: ['alerts'] as const,
-  lists: () => [...alertsKeys.all, 'list'] as const,
-};
-
-// Queries
+/**
+ * Fetch active system alerts.
+ */
 export function useAlerts() {
   return useQuery({
-    queryKey: alertsKeys.lists(),
-    queryFn: api.getAlerts,
+    queryKey: queryKeys.alerts.all,
+    queryFn: () => MetricsApi.getAlerts(),
+    refetchInterval: 15000,
   });
 }
 
-// Mutations
+/**
+ * Mutation hook to clear all active alerts.
+ * Automatically invalidates relevant caches and notifies user via toast.
+ */
 export function useClearAlerts() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: api.clearAlerts,
+    mutationFn: () => MetricsApi.clearAlerts(),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: alertsKeys.lists() });
+      toast.success('Alerts cleared successfully');
+      queryClient.invalidateQueries({ queryKey: queryKeys.alerts.all });
+    },
+    onError: (err: any) => {
+      toast.error(`Failed to clear alerts: ${err.message}`);
     },
   });
 }
