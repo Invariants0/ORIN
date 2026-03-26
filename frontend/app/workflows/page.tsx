@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useWorkflows } from '@/hooks/queries/useWorkflowQueries';
 import { useMetrics } from '@/hooks/queries/useMetricsQueries';
-import { useAllWorkflows } from '@/hooks/useWorkflowSelectors';
+
 import { useMetricsStore } from '@/stores/metrics.store';
 import { useAlertsStore } from '@/stores/alerts.store';
 import { useWebSocketContext } from '@/providers/websocket-provider';
@@ -29,6 +29,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { useAutonomyStore } from '@/stores/autonomy.store';
+import { useAutonomyActions, useExecuteAutonomyAction } from '@/hooks/queries/useAutonomyQueries';
 import { AutonomyLevelSelector } from '@/components/features/autonomy/AutonomyLevelSelector';
 import { ActionApprovalPanel } from '@/components/features/autonomy/ActionApprovalPanel';
 import { DecisionLogViewer } from '@/components/features/autonomy/DecisionLogViewer';
@@ -57,16 +58,16 @@ export default function WorkflowsPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<Tab>('overview');
 
-  const { data: workflowsData = [], isLoading, refetch } = useWorkflows();
+  const { data: workflows = [], isLoading, refetch } = useWorkflows();
   const { data: metricsData } = useMetrics();
-  const workflows = useAllWorkflows();
   const { alerts, removeAlert, acknowledgeAlert, clearAlerts } = useAlertsStore();
-  const { level, actions, setLevel, updateAction } = useAutonomyStore();
+  // Autonomy — real data from backend + optimistic mutations
+  const { level, setLevel } = useAutonomyStore();
+  const { data: actions = [], isLoading: actionsLoading } = useAutonomyActions();
+  const { mutate: executeAction } = useExecuteAutonomyAction();
   useWebSocketContext();
 
-  const displayWorkflows: Workflow[] = Array.isArray(workflows) && workflows.length > 0
-    ? workflows
-    : (Array.isArray(workflowsData) ? workflowsData : []);
+  const displayWorkflows = workflows;
   const displayMetrics = isSystemMetrics(metricsData)
     ? metricsData
     : useMetricsStore.getState().metrics;
@@ -293,12 +294,12 @@ export default function WorkflowsPage() {
                       <BrandBadge variant="sage">APPROVALS</BrandBadge>
                       <h2 className="text-2xl font-black uppercase tracking-tighter">Pending Actions</h2>
                     </div>
-                    <ActionApprovalPanel 
-                      actions={actions}
-                      onApprove={(id) => updateAction(id, 'approved')}
-                      onReject={(id) => updateAction(id, 'rejected')}
-                      onUndo={(id) => updateAction(id, 'pending')}
-                    />
+                  <ActionApprovalPanel 
+                    actions={actions}
+                    onApprove={(id) => executeAction({ actionId: id, approvalData: { approvedBy: 'user' } })}
+                    onReject={(id) => executeAction({ actionId: id, approvalData: { note: 'rejected-by-user' } })}
+                    onUndo={(_id) => { /* Phase 5 — undo not yet supported by backend */ }}
+                  />
                   </div>
                   
                   <div className="space-y-4">

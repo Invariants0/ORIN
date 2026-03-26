@@ -6,10 +6,14 @@ import { Topbar } from '@/components/layout/Topbar';
 import { OrinChatWindow } from '@/components/features/chat/ChatWindow';
 import { OrinChatInput } from '@/components/features/chat/OrinChatInput';
 import { useOrinStore } from '@/stores/useOrinStore';
+import { useCommandCenterWebSocket } from '@/hooks/useCommandCenterWebSocket';
 
 export default function DashboardPage() {
   const { currentSessionId, newSession } = useOrinStore();
   const inputPrefillRef = useRef<((text: string) => void) | null>(null);
+
+  // Mount real-time command execution WebSocket
+  useCommandCenterWebSocket(currentSessionId);
 
   // Auto-create a new session if none is selected
   useEffect(() => {
