@@ -4,7 +4,7 @@ export type Role = 'user' | 'assistant';
 
 export interface CommandStep {
   label: string;
-  status: 'pending' | 'running' | 'done';
+  status: 'pending' | 'running' | 'done' | 'failed';
 }
 
 export interface OrinMessage {
@@ -13,11 +13,11 @@ export interface OrinMessage {
   content: string;
   timestamp: number;
   references?: string[];
-  // For slash-command rendering
-  command?: string;       // e.g. "/store"
-  commandArgs?: string;   // everything after the command
+  command?: string;
+  commandArgs?: string;
   commandSteps?: CommandStep[];
-  isStreaming?: boolean;  // true while steps still animating
+  isStreaming?: boolean;
+  metadata?: any;
 }
 
 export interface OrinSession {
@@ -40,60 +40,6 @@ export interface OrinConnections {
   slack: boolean;
 }
 
-const DEMO: Record<string, OrinMessage[]> = {
-  '1': [
-    {
-      id: '1-a', role: 'assistant',
-      content: "Welcome back! Your Notion workspace has 3 new documents since your last visit.",
-      timestamp: Date.now() - 7200000,
-    },
-    {
-      id: '1-b', role: 'user',
-      content: "What's the latest on the multi-agent architecture?",
-      timestamp: Date.now() - 3600000,
-    },
-    {
-      id: '1-c', role: 'assistant',
-      content: "Your Notion database has 3 documents about multi-agent systems. Key finding: the orchestrator pattern you documented aligns with the meta-orchestrator design.",
-      timestamp: Date.now() - 3540000,
-      references: ['Multi_Agent_Docs', 'Architecture_Notes'],
-    },
-  ],
-  '2': [
-    {
-      id: '2-a', role: 'assistant',
-      content: "Notion Integration Ideas session loaded. You've explored 7 integration patterns. Let's continue.",
-      timestamp: Date.now() - 86400000,
-    },
-    {
-      id: '2-b', role: 'user',
-      command: '/analyze',
-      commandArgs: '--target notion_workspace',
-      content: '/analyze --target notion_workspace',
-      timestamp: Date.now() - 86340000,
-    },
-    {
-      id: '2-c', role: 'assistant',
-      content: "Analysis complete. Found 12 databases and 47 pages.",
-      timestamp: Date.now() - 86280000,
-      commandSteps: [
-        { label: 'Scanning Notion workspace structure', status: 'done' },
-        { label: 'Running semantic similarity analysis', status: 'done' },
-        { label: 'Detecting duplicate and orphaned pages', status: 'done' },
-        { label: 'Generating structural insights report', status: 'done' },
-      ],
-      references: ['Notion_Analysis', 'Duplicate_Report'],
-    },
-  ],
-  '3': [
-    {
-      id: '3-a', role: 'assistant',
-      content: "Marketing Strategy v2 session. Your last plan is in Notion. Ready to update it?",
-      timestamp: Date.now() - 172800000,
-    },
-  ],
-};
-
 interface OrinState {
   user: OrinUser | null;
   mode: Mode;
@@ -108,30 +54,32 @@ interface OrinActions {
   setUser: (u: OrinUser | null) => void;
   setMode: (m: Mode) => void;
   setCurrentSessionId: (id: string | null) => void;
+  setSessions: (sessions: OrinSession[]) => void;
   getMessages: () => OrinMessage[];
   addMessage: (msg: OrinMessage) => void;
   updateMessage: (id: string, patch: Partial<OrinMessage>) => void;
   updateConnection: (key: keyof OrinConnections, val: boolean) => void;
   setLoading: (key: keyof OrinState['loadingStates'], val: boolean) => void;
   newSession: () => void;
+  setSession: (id: string) => void;
 }
 
 export const useOrinStore = create<OrinState & OrinActions>((set, get) => ({
+  // ── State ──────────────────────────────────────────────────────────────
   user: null,
   mode: 'explore',
-  sessions: [
-    { id: '1', title: 'Project Orin Research',    createdAt: Date.now() - 7200000  },
-    { id: '2', title: 'Notion Integration Ideas', createdAt: Date.now() - 86400000 },
-    { id: '3', title: 'Marketing Strategy v2',    createdAt: Date.now() - 172800000 },
-  ],
-  currentSessionId: '1',
-  sessionMessages: { ...DEMO },
-  connections: { notion: true, email: false, slack: false },
+  sessions: [],            // populated by React Query / API
+  currentSessionId: null,  // set after sessions load
+  sessionMessages: {},     // populated on session select
+  connections: { notion: false, email: false, slack: false },
   loadingStates: { sendingMessage: false },
 
+  // ── Actions ────────────────────────────────────────────────────────────
   setUser: (user) => set({ user }),
   setMode: (mode) => set({ mode }),
   setCurrentSessionId: (id) => set({ currentSessionId: id }),
+  setSession: (id) => set({ currentSessionId: id }),
+  setSessions: (sessions) => set({ sessions }),
 
   getMessages: () => {
     const { currentSessionId, sessionMessages } = get();
