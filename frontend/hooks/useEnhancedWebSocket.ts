@@ -103,10 +103,10 @@ export function useEnhancedWebSocket() {
 
     // Process through event ordering system
     const processed = processOrderedEvent(
-      event,
+      event as any,
       event.version,
-      (orderedEvent) => {
-        processWorkflowEventInternal(orderedEvent);
+      (orderedEvent: any) => {
+        processWorkflowEventInternal(orderedEvent as WorkflowEvent & VersionedMessage);
       }
     );
 
@@ -201,7 +201,8 @@ export function useEnhancedWebSocket() {
         };
 
         // Reconcile with Zustand state
-        const zustandWorkflow = updateWorkflow(workflowId, updates);
+        updateWorkflow(workflowId, updates);
+        const zustandWorkflow = useWorkflowStore.getState().workflowsById[workflowId];
         
         if (zustandWorkflow) {
           const reconciliation = reconciliationEngine.reconcile(
