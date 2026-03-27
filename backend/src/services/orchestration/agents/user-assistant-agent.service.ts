@@ -7,7 +7,8 @@ import {
   AuthorityLevel,
   AgentMessage,
   AgentProposal,
-  UserAssistantInput
+  UserAssistantInput,
+  MessagePriority
 } from '@/types/agent.types.js';
 
 export class UserAssistantAgent extends BaseAgent {
@@ -152,7 +153,7 @@ export class UserAssistantAgent extends BaseAgent {
         message.from,
         'response',
         { result },
-        'medium',
+        MessagePriority.MEDIUM,
         message.id
       );
     }
@@ -161,7 +162,7 @@ export class UserAssistantAgent extends BaseAgent {
       message.from,
       'response',
       { message: 'Unable to process request' },
-      'low',
+      MessagePriority.LOW,
       message.id
     );
   }

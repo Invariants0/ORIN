@@ -2,7 +2,6 @@ import logger from '@/config/logger.js';
 import { geminiService } from '@/services/ai/gemini.service.js';
 import { sessionService } from '@/services/infrastructure/session.service.js';
 import { taskService } from '@/services/workflow/task.service.js';
-import { executionService } from '@/services/workflow/execution.service.js';
 
 interface NextAction {
   suggestedAction: string;

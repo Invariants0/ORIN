@@ -168,7 +168,8 @@ class SafetyControllerService {
         type: 'resource_limit',
         severity: 'high',
         description: check.reason || 'Resource limits exceeded',
-        violator: 'system'
+        violator: 'system',
+        action: 'monitor'
       });
     }
   }
