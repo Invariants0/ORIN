@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import logger from '@/config/logger.js';
+import envVars from '@/config/envVars.js';
 import { workflowRepository } from '@/services/workflow/workflow.repository.js';
 import { workflowAgentService } from '@/services/workflow/workflow-agent.service.js';
 import { monitoringService } from '@/services/infrastructure/monitoring.service.js';
@@ -291,7 +292,9 @@ class WorkflowController {
       const { userId } = req.query;
 
       const stats = await workflowRepository.getStatistics(userId as string);
-      const systemMetrics = await monitoringService.getSystemMetrics();
+      const systemMetrics = envVars.MONITORING_ENABLED === "true"
+        ? await monitoringService.getSystemMetrics()
+        : null;
 
       res.json({
         success: true,
@@ -315,6 +318,14 @@ class WorkflowController {
    */
   async getMetrics(req: Request, res: Response) {
     try {
+      if (envVars.MONITORING_ENABLED !== "true") {
+        return res.json({
+          success: true,
+          data: [],
+          disabled: true
+        });
+      }
+
       const metrics = monitoringService.getAllWorkflowMetrics();
 
       res.json({
@@ -338,6 +349,15 @@ class WorkflowController {
     try {
       const { limit = '50' } = req.query;
 
+      if (envVars.MONITORING_ENABLED !== "true") {
+        return res.json({
+          success: true,
+          data: [],
+          count: 0,
+          disabled: true
+        });
+      }
+
       const alerts = monitoringService.getAlerts(parseInt(limit as string));
 
       res.json({
@@ -360,6 +380,13 @@ class WorkflowController {
    */
   async clearAlerts(req: Request, res: Response) {
     try {
+      if (envVars.MONITORING_ENABLED !== "true") {
+        return res.json({
+          success: true,
+          message: 'Monitoring disabled'
+        });
+      }
+
       monitoringService.clearAlerts();
 
       res.json({
