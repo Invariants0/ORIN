@@ -25,18 +25,19 @@ function signState(payload: string): string {
   return crypto.createHmac("sha256", secret).update(payload).digest("base64url");
 }
 
-function createState(userId: string): string {
+function createState(userId: string, returnTo?: string): string {
   const payload = JSON.stringify({
     userId,
     nonce: crypto.randomUUID(),
-    ts: Date.now()
+    ts: Date.now(),
+    returnTo
   });
   const encoded = base64UrlEncode(payload);
   const signature = signState(encoded);
   return `${encoded}${STATE_SEPARATOR}${signature}`;
 }
 
-function parseState(state: string): { userId: string; ts: number } {
+function parseState(state: string): { userId: string; ts: number; returnTo?: string } {
   const [encoded, signature] = state.split(STATE_SEPARATOR);
   if (!encoded || !signature) {
     throw APIError.badRequest("Invalid OAuth state");
@@ -45,7 +46,7 @@ function parseState(state: string): { userId: string; ts: number } {
   if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) {
     throw APIError.badRequest("Invalid OAuth state signature");
   }
-  const decoded = JSON.parse(base64UrlDecode(encoded)) as { userId: string; ts: number };
+  const decoded = JSON.parse(base64UrlDecode(encoded)) as { userId: string; ts: number; returnTo?: string };
   if (!decoded.userId) throw APIError.badRequest("OAuth state missing userId");
   if (!decoded.ts || typeof decoded.ts !== "number") {
     throw APIError.badRequest("OAuth state missing timestamp");
@@ -66,7 +67,9 @@ export const startNotionOAuth = catchAsync(async (req: Request, res: Response) =
   const userId = (req as any).user?.id as string | undefined;
   if (!userId) throw APIError.unauthorized("Authentication required");
 
-  const state = createState(userId);
+  const returnTo = typeof req.query.returnTo === "string" ? req.query.returnTo : undefined;
+  const safeReturnTo = returnTo && returnTo.startsWith("/") ? returnTo : undefined;
+  const state = createState(userId, safeReturnTo);
   const authUrl = notionOauthService.buildAuthorizeUrl(state);
   res.status(302).redirect(authUrl);
 });
@@ -85,12 +88,15 @@ export const handleNotionOAuthCallback = catchAsync(async (req: Request, res: Re
     throw APIError.badRequest("OAuth callback missing code or state");
   }
 
-  const { userId } = parseState(state);
+  const { userId, returnTo } = parseState(state);
   const tokens = await notionOauthService.exchangeCodeForToken(code);
   await notionOauthService.storeTokenForUser(userId, tokens);
 
-  const redirectUrl = envVars.NOTION_OAUTH_SUCCESS_REDIRECT || envVars.FRONTEND_URL || "http://localhost:3000";
-  res.redirect(`${redirectUrl}/settings?notion=connected`);
+  const redirectBase = envVars.NOTION_OAUTH_SUCCESS_REDIRECT || envVars.FRONTEND_URL || "http://localhost:3000";
+  const path = returnTo && returnTo.startsWith("/") ? returnTo : "/settings";
+  const hasQuery = path.includes("?");
+  const target = `${redirectBase}${path}${hasQuery ? "&" : "?"}notion=connected`;
+  res.redirect(target);
 });
 
 export const getNotionOAuthStatus = catchAsync(async (req: Request, res: Response) => {
