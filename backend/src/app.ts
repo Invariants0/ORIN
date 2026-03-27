@@ -5,14 +5,7 @@ import morgan from "morgan";
 
 import envVars from "@/config/envVars.js";
 import logger from "@/config/logger.js";
-import healthRoutes from "@/routes/health.routes.js";
-import chatRoutes from "@/routes/chat.routes.js";
-import intentRoutes from "@/routes/intent.routes.js";
-import workflowRoutes from "@/routes/workflow.routes.js";
-import evolutionRoutes from "@/routes/evolution.routes.js";
-import multiAgentRoutes from "@/routes/multi-agent.routes.js";
-import autonomyRoutes from "@/routes/autonomy.routes.js";
-import authRoutes from "@/routes/auth.routes.js";
+import rootRouter from "@/routes/index.js";
 import { APIError } from "@/utils/errors.js";
 
 const app = express();
@@ -38,14 +31,7 @@ if (envVars.NODE_ENV === "development") {
 }
 
 // Register routes
-app.use("/api", healthRoutes);
-app.use("/api/v1", chatRoutes);
-app.use("/api/v1/intent", intentRoutes);
-app.use("/api/v1/workflows", workflowRoutes);
-app.use("/api/evolution", evolutionRoutes);
-app.use("/api/multi-agent", multiAgentRoutes);
-app.use("/api/autonomy", autonomyRoutes);
-app.use("/api/auth", authRoutes);
+app.use("/api", rootRouter);
 
 // 404 handler
 app.use((req, res) => {

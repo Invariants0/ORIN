@@ -21,9 +21,9 @@ model User {
   notionToken   String?
   geminiKey     String?
 
-  sessions  Session[]
+  sessions     Session[]
   chatSessions ChatSession[]
-  accounts  Account[]
+  accounts     Account[]
 
   @@map("users")
 }
@@ -44,20 +44,20 @@ model Session {
 }
 
 model ChatSession {
-  id        String    @id @default(cuid())
+  id        String   @id @default(cuid())
   userId    String
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   title     String?
   summary   String?
-  mode      String    @default("explore") // explore | build
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  mode      String   @default("explore") // explore | build
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  messages         Message[]
-  tasks            Task[]
-  decisionMetrics  DecisionMetrics[]
-  workflows        Workflow[]
-  decisions        Decision[]
+  messages        Message[]
+  tasks           Task[]
+  decisionMetrics DecisionMetrics[]
+  workflows       Workflow[]
+  decisions       Decision[]
 
   @@index([userId])
   @@map("chat_sessions")
@@ -96,13 +96,13 @@ model Verification {
 }
 
 model Message {
-  id            String      @id @default(cuid())
+  id            String   @id @default(cuid())
   chatSessionId String
-  role          String      // user | assistant
-  content       String      // long text content
-  intent        String?     // STORE | QUERY | GENERATE_DOC | OPERATE | UNCLEAR
-  metadata      Json?       // Additional metadata (processing time, confidence, etc.)
-  createdAt     DateTime    @default(now())
+  role          String // user | assistant
+  content       String // long text content
+  intent        String? // STORE | QUERY | GENERATE_DOC | OPERATE | UNCLEAR
+  metadata      Json? // Additional metadata (processing time, confidence, etc.)
+  createdAt     DateTime @default(now())
 
   chatSession ChatSession @relation(fields: [chatSessionId], references: [id], onDelete: Cascade)
 
@@ -124,8 +124,8 @@ model Task {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  chatSession ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  metrics TaskMetrics?
+  chatSession ChatSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  metrics     TaskMetrics?
 
   @@index([sessionId])
   @@index([userId])
@@ -193,9 +193,9 @@ model Workflow {
   lockedBy    String? // Worker ID that locked this workflow
   lockedAt    DateTime?
 
-  chatSession ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  steps   WorkflowStep[]
-  results WorkflowResult[]
+  chatSession ChatSession      @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  steps       WorkflowStep[]
+  results     WorkflowResult[]
 
   @@index([userId])
   @@index([sessionId])
@@ -297,8 +297,8 @@ model Decision {
   requiresApproval Boolean  @default(false)
   createdAt        DateTime @default(now())
 
-  chatSession ChatSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
-  executions ActionExecution[]
+  chatSession ChatSession?      @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  executions  ActionExecution[]
 
   @@index([userId])
   @@index([sessionId])
