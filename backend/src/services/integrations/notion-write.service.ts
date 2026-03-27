@@ -1,5 +1,8 @@
+import envVars from '@/config/envVars.js';
 import notionService from '@/services/integrations/notion.service.js';
+import notionMcpService from '@/services/integrations/notion-mcp.service.js';
 import logger from '@/config/logger.js';
+import db from '@/config/database.js';
 
 export interface InboxEntryInput {
   title: string;
@@ -46,41 +49,59 @@ class NotionWriteService {
       // Step 1: Validate input
       this.validateInput(input);
 
-      // Step 2: Transform content into Notion blocks
-      const contentBlocks = this.transformContentToBlocks(input.content, input);
+      const useMcp = envVars.NOTION_PROVIDER === 'mcp';
+      let pageId = '';
+      let pageUrl = '';
 
-      // Step 3: Create page in Notion workspace (no parent = workspace level)
-      const page = await notionService.createPage({
-        parent: { type: 'workspace', workspace: true } as any,
-        properties: {
-          title: {
-            title: [{
-              text: {
-                content: input.title
-              }
-            }]
-          }
-        },
-        icon: {
-          type: 'emoji',
-          emoji: this.getIconForType(input.type)
-        } as any,
-        children: contentBlocks
-      });
+      if (useMcp) {
+        const token = await this.getUserNotionToken(input.userId);
+        const content = this.renderMarkdownContent(input);
+        const mcpResult = await notionMcpService.createPage({
+          title: input.title,
+          content,
+          icon: this.getIconForType(input.type),
+          token
+        });
+        pageId = mcpResult.pageId;
+        pageUrl = mcpResult.url || '';
+      } else {
+        // Step 2: Transform content into Notion blocks
+        const contentBlocks = this.transformContentToBlocks(input.content, input);
 
-      const pageUrl = (page as any).url || `https://notion.so/${page.id.replace(/-/g, '')}`;
+        // Step 3: Create page in Notion workspace (no parent = workspace level)
+        const page = await notionService.createPage({
+          parent: { type: 'workspace', workspace: true } as any,
+          properties: {
+            title: {
+              title: [{
+                text: {
+                  content: input.title
+                }
+              }]
+            }
+          },
+          icon: {
+            type: 'emoji',
+            emoji: this.getIconForType(input.type)
+          } as any,
+          children: contentBlocks
+        });
+
+        pageId = page.id;
+        pageUrl = (page as any).url || `https://notion.so/${page.id.replace(/-/g, '')}`;
+      }
 
       const processingTimeMs = Date.now() - startTime;
 
       logger.info('[Notion Write] Inbox entry created successfully', {
-        pageId: page.id,
+        pageId,
         url: pageUrl,
         processingTimeMs
       });
 
       return {
-        pageId: page.id,
-        url: pageUrl,
+        pageId,
+        url: pageUrl || `https://notion.so/${pageId.replace(/-/g, '')}`,
         created: true,
         duplicate: false
       };
@@ -271,6 +292,16 @@ class NotionWriteService {
     }
 
     return blocks;
+  }
+
+  private renderMarkdownContent(input: InboxEntryInput): string {
+    const meta = `Type: ${input.type}\nTags: ${input.tags.join(', ') || 'none'}\nCreated: ${new Date().toLocaleString()}`;
+    return `# ${input.title}\n\n${meta}\n\n---\n\n${input.content}`;
+  }
+
+  private async getUserNotionToken(userId: string): Promise<string | undefined> {
+    const user = await db.user.findUnique({ where: { id: userId } });
+    return user?.notionToken || envVars.NOTION_MCP_TOKEN;
   }
 
   /**

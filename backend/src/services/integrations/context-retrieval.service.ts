@@ -1,6 +1,8 @@
-import notionService from '@/services/integrations/notion.service.js';
-import logger from '@/config/logger.js';
 import envVars from '@/config/envVars.js';
+import notionService from '@/services/integrations/notion.service.js';
+import notionMcpService from '@/services/integrations/notion-mcp.service.js';
+import logger from '@/config/logger.js';
+import db from '@/config/database.js';
 
 export interface ContextRetrievalInput {
   query: string;
@@ -150,6 +152,12 @@ class ContextRetrievalService {
    */
   private async queryNotionDatabase(input: ContextRetrievalInput): Promise<any[]> {
     try {
+      if (envVars.NOTION_PROVIDER === 'mcp') {
+        const token = await this.getUserNotionToken(input.userId);
+        const results = await notionMcpService.search(input.query, token);
+        return Array.isArray(results) ? results : [];
+      }
+
       const databaseId = envVars.NOTION_DATABASE_ID || '';
       if (!databaseId) {
         logger.warn('[Context Retrieval] No Notion database ID configured');
@@ -194,13 +202,13 @@ class ContextRetrievalService {
 
     for (const result of rawResults) {
       try {
-        // Extract data from Notion result
+        // Extract data from Notion result (MCP and REST)
         const title = this.extractTitle(result);
         const tags = this.extractTags(result);
         const type = this.extractType(result);
         const content = this.extractContent(result);
         const createdAt = this.extractCreatedAt(result);
-        const url = result.url || `https://notion.so/${result.id.replace(/-/g, '')}`;
+        const url = result.url || result?.page?.url || `https://notion.so/${result.id?.replace(/-/g, '')}`;
 
         // Calculate relevance score
         const relevanceScore = this.calculateRelevanceScore({
@@ -381,6 +389,10 @@ class ContextRetrievalService {
    */
   private extractTitle(result: any): string {
     try {
+      if (result?.title) return result.title;
+      if (result?.properties?.title?.title?.[0]?.plain_text) {
+        return result.properties.title.title[0].plain_text;
+      }
       const titleProperty = result.properties.Title || result.properties.title;
       if (titleProperty?.title?.[0]?.plain_text) {
         return titleProperty.title[0].plain_text;
@@ -396,6 +408,9 @@ class ContextRetrievalService {
    */
   private extractTags(result: any): string[] {
     try {
+      if (Array.isArray(result?.tags)) {
+        return result.tags;
+      }
       const tagsProperty = result.properties.Tags || result.properties.tags;
       if (tagsProperty?.multi_select) {
         return tagsProperty.multi_select.map((tag: any) => tag.name);
@@ -411,6 +426,7 @@ class ContextRetrievalService {
    */
   private extractType(result: any): string {
     try {
+      if (result?.type) return result.type;
       const typeProperty = result.properties.Type || result.properties.type;
       if (typeProperty?.select?.name) {
         return typeProperty.select.name;
@@ -426,6 +442,8 @@ class ContextRetrievalService {
    */
   private extractContent(result: any): string {
     try {
+      if (result?.content) return result.content;
+      if (result?.summary) return result.summary;
       // Try to get from Content property
       const contentProperty = result.properties.Content || result.properties.content;
       if (contentProperty?.rich_text?.[0]?.plain_text) {
@@ -453,6 +471,7 @@ class ContextRetrievalService {
    */
   private extractCreatedAt(result: any): string {
     try {
+      if (result?.created_time) return result.created_time;
       const createdProperty = result.properties['Created At'] || result.properties.created_at;
       if (createdProperty?.date?.start) {
         return createdProperty.date.start;
@@ -510,6 +529,11 @@ ${result.content}
 URL: ${result.url}
 ${'='.repeat(80)}`;
     }).join('\n\n');
+  }
+
+  private async getUserNotionToken(userId: string): Promise<string | undefined> {
+    const user = await db.user.findUnique({ where: { id: userId } });
+    return user?.notionToken || envVars.NOTION_MCP_TOKEN;
   }
 }
 
