@@ -1,8 +1,8 @@
 import { Request, Response } from "express";
 import catchAsync from "@/handlers/async.handler.js";
 import { APIError } from "@/utils/errors.js";
-import orchestratorService from "@/services/orchestrator.service.js";
-import sessionService from "@/services/session.service.js";
+import orchestratorService from "@/services/orchestration/orchestrator.service.js";
+import sessionService from "@/services/infrastructure/session.service.js";
 import logger from "@/config/logger.js";
 
 /**

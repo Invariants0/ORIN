@@ -1,8 +1,8 @@
 import { Request, Response } from 'express';
-import { logger } from '../config/logger';
-import { workflowRepository } from '../services/workflow.repository';
-import { workflowAgentService } from '../services/workflow-agent.service';
-import { monitoringService } from '../services/monitoring.service';
+import logger from '@/config/logger.js';
+import { workflowRepository } from '@/services/workflow/workflow.repository.js';
+import { workflowAgentService } from '@/services/workflow/workflow-agent.service.js';
+import { monitoringService } from '@/services/infrastructure/monitoring.service.js';
 
 class WorkflowController {
   /**
@@ -65,7 +65,7 @@ class WorkflowController {
     try {
       const { id } = req.params;
 
-      const workflow = await workflowRepository.getWorkflow(id);
+      const workflow = await workflowRepository.getWorkflow(id as string);
 
       if (!workflow) {
         return res.status(404).json({
@@ -75,10 +75,10 @@ class WorkflowController {
       }
 
       // Get metrics
-      const metrics = monitoringService.getWorkflowMetrics(id);
+      const metrics = monitoringService.getWorkflowMetrics(id as string);
 
       // Get results
-      const results = await workflowRepository.getResults(id);
+      const results = await workflowRepository.getResults(id as string);
 
       res.json({
         success: true,
@@ -140,7 +140,7 @@ class WorkflowController {
       const { id } = req.params;
       const { reason = 'Paused by user' } = req.body;
 
-      const workflow = await workflowRepository.getWorkflow(id);
+      const workflow = await workflowRepository.getWorkflow(id as string);
 
       if (!workflow) {
         return res.status(404).json({
@@ -157,13 +157,13 @@ class WorkflowController {
       }
 
       // Update workflow status
-      await workflowRepository.updateWorkflow(id, {
+      await workflowRepository.updateWorkflow(id as string, {
         status: 'paused',
         pauseReason: reason
       });
 
       // Track event
-      monitoringService.trackWorkflowPaused(id, reason);
+      monitoringService.trackWorkflowPaused(id as string, reason);
 
       logger.info('Workflow paused', { workflowId: id, reason });
 
@@ -188,7 +188,7 @@ class WorkflowController {
     try {
       const { id } = req.params;
 
-      const workflow = await workflowRepository.getWorkflow(id);
+      const workflow = await workflowRepository.getWorkflow(id as string);
 
       if (!workflow) {
         return res.status(404).json({
@@ -205,7 +205,7 @@ class WorkflowController {
       }
 
       // Update workflow status back to running
-      await workflowRepository.updateWorkflow(id, {
+      await workflowRepository.updateWorkflow(id as string, {
         status: 'running',
         pauseReason: null,
         lockedBy: null, // Release lock so worker can pick it up
@@ -213,7 +213,7 @@ class WorkflowController {
       });
 
       // Track event
-      monitoringService.trackWorkflowStarted(id, workflow.steps.length);
+      monitoringService.trackWorkflowStarted(id as string, workflow.steps.length);
 
       logger.info('Workflow resumed', { workflowId: id });
 
@@ -239,7 +239,7 @@ class WorkflowController {
       const { id } = req.params;
       const { reason = 'Cancelled by user' } = req.body;
 
-      const workflow = await workflowRepository.getWorkflow(id);
+      const workflow = await workflowRepository.getWorkflow(id as string);
 
       if (!workflow) {
         return res.status(404).json({
@@ -256,7 +256,7 @@ class WorkflowController {
       }
 
       // Update workflow status
-      await workflowRepository.updateWorkflow(id, {
+      await workflowRepository.updateWorkflow(id as string, {
         status: 'failed',
         pauseReason: reason,
         completedAt: new Date(),
@@ -265,7 +265,7 @@ class WorkflowController {
       });
 
       // Track event
-      monitoringService.trackWorkflowFailed(id, reason);
+      monitoringService.trackWorkflowFailed(id as string, reason);
 
       logger.info('Workflow cancelled', { workflowId: id, reason });
 

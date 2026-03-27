@@ -2,16 +2,16 @@
 // API endpoints for self-evolving agent system
 
 import { Request, Response } from 'express';
-import logger from '../config/logger.js';
-import { asyncHandler } from '../handlers/async.handler.js';
-import evolutionOrchestratorService from '../services/evolution/evolution-orchestrator.service.js';
-import agentEvolutionService from '../services/evolution/agent-evolution.service.js';
-import agentFactoryService from '../services/evolution/agent-factory.service.js';
-import metaLearningService from '../services/evolution/meta-learning.service.js';
-import architectureOptimizerService from '../services/evolution/architecture-optimizer.service.js';
-import safetyControllerService from '../services/evolution/safety-controller.service.js';
-import selfOptimizationService from '../services/evolution/self-optimization.service.js';
-import { AgentType } from '../types/agent.types.js';
+import logger from '@/config/logger.js';
+import { asyncHandler } from '@/handlers/async.handler.js';
+import evolutionOrchestratorService from '@/services/evolution/evolution-orchestrator.service.js';
+import agentEvolutionService from '@/services/evolution/agent-evolution.service.js';
+import agentFactoryService from '@/services/evolution/agent-factory.service.js';
+import metaLearningService from '@/services/evolution/meta-learning.service.js';
+import architectureOptimizerService from '@/services/evolution/architecture-optimizer.service.js';
+import safetyControllerService from '@/services/evolution/safety-controller.service.js';
+import selfOptimizationService from '@/services/evolution/self-optimization.service.js';
+import { AgentType } from '@/types/agent.types.js';
 
 /**
  * Initialize evolution system
@@ -204,7 +204,7 @@ export const removeDynamicAgent = asyncHandler(async (req: Request, res: Respons
 
   logger.info('[EvolutionController] Removing dynamic agent', { agentId });
 
-  const removed = await agentFactoryService.removeAgent(agentId, reason || 'Manual removal');
+  const removed = await agentFactoryService.removeAgent(agentId as string, reason || 'Manual removal');
 
   if (!removed) {
     return res.status(404).json({
@@ -225,7 +225,7 @@ export const removeDynamicAgent = asyncHandler(async (req: Request, res: Respons
 export const getAgentLifecycle = asyncHandler(async (req: Request, res: Response) => {
   const { agentId } = req.params;
 
-  const lifecycle = agentFactoryService.getAgentLifecycle(agentId);
+  const lifecycle = agentFactoryService.getAgentLifecycle(agentId as string);
 
   if (!lifecycle) {
     return res.status(404).json({
