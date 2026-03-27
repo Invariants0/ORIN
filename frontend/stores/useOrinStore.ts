@@ -32,6 +32,7 @@ export interface OrinUser {
   id: string;
   email: string;
   name: string;
+  avatar?: string;
 }
 
 export interface OrinConnections {
@@ -48,6 +49,7 @@ interface OrinState {
   sessionMessages: Record<string, OrinMessage[]>;
   connections: OrinConnections;
   loadingStates: { sendingMessage: boolean };
+  isAccountOpen: boolean;
 }
 
 interface OrinActions {
@@ -62,6 +64,7 @@ interface OrinActions {
   setLoading: (key: keyof OrinState['loadingStates'], val: boolean) => void;
   newSession: () => void;
   setSession: (id: string) => void;
+  setIsAccountOpen: (open: boolean) => void;
 }
 
 export const useOrinStore = create<OrinState & OrinActions>((set, get) => ({
@@ -73,6 +76,7 @@ export const useOrinStore = create<OrinState & OrinActions>((set, get) => ({
   sessionMessages: {},     // populated on session select
   connections: { notion: false, email: false, slack: false },
   loadingStates: { sendingMessage: false },
+  isAccountOpen: false,
 
   // ── Actions ────────────────────────────────────────────────────────────
   setUser: (user) => set({ user }),
@@ -126,4 +130,6 @@ export const useOrinStore = create<OrinState & OrinActions>((set, get) => ({
       sessionMessages: { ...s.sessionMessages, [id]: [] },
     }));
   },
+
+  setIsAccountOpen: (open) => set({ isAccountOpen: open }),
 }));

@@ -87,9 +87,12 @@ export const OrinChatInput = ({ prefillRef }: OrinChatInputProps) => {
 
     try {
       // 3. Call ChatApi orchestrator
+      // Only pass sessionId if it's not a temporary client-side ID
+      const validSessionId = currentSessionId?.startsWith('session-') ? undefined : currentSessionId;
+      
       const response = await ChatApi.sendMessage({
         message: trimmed,
-        sessionId: currentSessionId
+        sessionId: validSessionId
       });
 
       // Update Session ID if it's new
@@ -246,7 +249,7 @@ export const OrinChatInput = ({ prefillRef }: OrinChatInputProps) => {
               className={cn(
                 'w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-xl border-2 border-black transition-all',
                 input.trim() && !isSending
-                  ? mode === 'build' ? 'bg-[#ffe17c] hover:shadow-[2px_2px_0px_0px_#000]' : 'bg-black text-white hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,0.3)]'
+                  ? 'bg-[#ffe17c] text-black hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none'
                   : 'bg-neutral-100 text-black/30 border-black/10 cursor-not-allowed'
               )}
             >
