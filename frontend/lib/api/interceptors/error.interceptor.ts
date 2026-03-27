@@ -21,8 +21,7 @@ export const errorInterceptor = (error: AxiosError): Promise<never> => {
     if (status === 401) {
       console.warn('[API Error] Unauthorized - redirecting to login or clearing session.');
       if (typeof window !== 'undefined') {
-        localStorage.removeItem('orin_auth_token');
-        // window.location.href = '/login'; 
+        window.location.href = '/auth'; 
       }
     }
 
