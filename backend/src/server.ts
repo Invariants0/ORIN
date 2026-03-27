@@ -27,9 +27,13 @@ async function startServer() {
     websocketGateway.initialize(server);
     logger.info('✅ WebSocket server initialized');
 
-    // Start monitoring service
-    monitoringService.start();
-    logger.info('✅ Monitoring service started');
+    // Start monitoring service (optional)
+    if (envVars.MONITORING_ENABLED === "true") {
+      monitoringService.start();
+      logger.info('✅ Monitoring service started');
+    } else {
+      logger.info('⚠️ Monitoring service disabled');
+    }
 
     // Start workflow runner
     workflowRunnerService.start();
@@ -39,7 +43,9 @@ async function startServer() {
       logger.info("SIGTERM received: closing server and DB connection...");
       server.close(async () => {
         websocketGateway.shutdown();
-        monitoringService.stop();
+        if (envVars.MONITORING_ENABLED === "true") {
+          monitoringService.stop();
+        }
         workflowRunnerService.stop();
         await db.$disconnect();
         process.exit(0);
@@ -50,7 +56,9 @@ async function startServer() {
       logger.info("SIGINT received: closing server and DB connection...");
       server.close(async () => {
         websocketGateway.shutdown();
-        monitoringService.stop();
+        if (envVars.MONITORING_ENABLED === "true") {
+          monitoringService.stop();
+        }
         workflowRunnerService.stop();
         await db.$disconnect();
         process.exit(0);
