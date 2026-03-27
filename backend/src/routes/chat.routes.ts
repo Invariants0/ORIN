@@ -1,7 +1,9 @@
 import { Router } from "express";
 import { sendMessage, getSession, getUserSessions, deleteSession } from "@/controllers/chat.controller.js";
+import { authenticate } from "@/middlewares/auth.middleware.js";
 
 const router = Router();
+router.use(authenticate);
 
 /**
  * Main chat endpoint - All user interactions flow through orchestrator

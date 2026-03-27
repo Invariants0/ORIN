@@ -1,7 +1,5 @@
 import { NextFunction, Request, Response } from "express";
-import jwt from "jsonwebtoken";
 import { APIError } from "@/utils/errors.js";
-import envVars from "@/config/envVars.js";
 
 export type JwtPayload = {
   userId: string;
@@ -9,30 +7,28 @@ export type JwtPayload = {
   [key: string]: any;
 };
 
-export const authenticate = (req: Request, res: Response, next: NextFunction) => {
-  const authHeader = req.headers.authorization;
-  const token = authHeader?.startsWith("Bearer ") ? authHeader.split(" ")[1] : req.cookies?.JWT_SESSION;
+import { auth } from "@/config/auth.js";
+import { fromNodeHeaders } from "better-auth/node";
 
-  if (!token) {
-    return next(APIError.unauthorized("Authentication required"));
-  }
-
+export const authenticate = async (req: Request, _res: Response, next: NextFunction) => {
   try {
-    if (!envVars.JWT_SECRET) {
-      throw new Error("JWT_SECRET is not configured");
+    const session = await auth.api.getSession({
+      headers: fromNodeHeaders(req.headers),
+    });
+
+    if (!session || !session.user) {
+      return next(APIError.unauthorized("Authentication required"));
     }
 
-    const decoded = jwt.verify(token, envVars.JWT_SECRET) as JwtPayload;
-    (req as any).user = decoded;
-
+    (req as any).user = session.user;
     next();
   } catch (error) {
-    return next(APIError.unauthorized("Invalid or expired token"));
+    return next(APIError.unauthorized("Invalid or expired session"));
   }
 };
 
 export const authorizeRoles = (...allowedRoles: string[]) => {
-  return (req: Request, res: Response, next: NextFunction) => {
+  return (req: Request, _res: Response, next: NextFunction) => {
     const user = (req as any).user as JwtPayload | undefined;
     if (!user || !user.role || !allowedRoles.includes(user.role)) {
       return next(APIError.forbidden("Insufficient permissions"));
