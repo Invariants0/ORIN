@@ -33,11 +33,9 @@ export const AutonomyApi = {
    * Approve or reject an autonomous action.
    */
   executeAction: (payload: ExecuteActionRequest): Promise<ExecuteActionResponse> => {
-    // If user rejected, try to call undo endpoint since backend lacks explicit 'reject'
-    if (payload.approvalData?.note === 'rejected-by-user') {
+    if (payload.decision === 'reject') {
       return client.post(`/autonomy/undo/${payload.actionId}`).then(res => res.data.data || res.data);
     }
-    // Otherwise, approve it
     return client.post(`/autonomy/approve/${payload.actionId}`).then(res => res.data.data || res.data);
   },
 

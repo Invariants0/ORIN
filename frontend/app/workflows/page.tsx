@@ -296,8 +296,8 @@ export default function WorkflowsPage() {
                     </div>
                   <ActionApprovalPanel 
                     actions={actions}
-                    onApprove={(id) => executeAction({ actionId: id, approvalData: { approvedBy: 'user' } })}
-                    onReject={(id) => executeAction({ actionId: id, approvalData: { note: 'rejected-by-user' } })}
+                    onApprove={(id) => executeAction({ actionId: id, decision: 'approve', approvalData: { approvedBy: 'user' } })}
+                    onReject={(id) => executeAction({ actionId: id, decision: 'reject' })}
                     onUndo={(_id) => { /* Phase 5 — undo not yet supported by backend */ }}
                   />
                   </div>

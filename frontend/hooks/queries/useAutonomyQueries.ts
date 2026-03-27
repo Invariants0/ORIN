@@ -34,9 +34,12 @@ export function useExecuteAutonomyAction() {
   return useMutation({
     mutationFn: (payload: ExecuteActionRequest) => AutonomyApi.executeAction(payload),
 
-    onMutate: ({ actionId }) => {
-      // Optimistically mark as approved in local store
-      updateAction(actionId, 'approved');
+    onMutate: ({ actionId, decision }) => {
+      // Capture current status so we can roll back on failure
+      const previousStatus = useAutonomyStore.getState().actions.find((a) => a.id === actionId)?.status ?? 'pending';
+      // Optimistically reflect user intent
+      updateAction(actionId, decision === 'reject' ? 'rejected' : 'approved');
+      return { previousStatus };
     },
 
     onSuccess: (data, { actionId }) => {
@@ -45,10 +48,10 @@ export function useExecuteAutonomyAction() {
       updateAction(actionId, data.status);
     },
 
-    onError: (err: any, { actionId }) => {
+    onError: (err: any, { actionId }, context) => {
       toast.error(`Action failed: ${err.message}`);
-      // Rollback to pending on failure
-      updateAction(actionId, 'pending');
+      // Rollback to captured previous status
+      updateAction(actionId, context?.previousStatus ?? 'pending');
     },
 
     onSettled: () => {

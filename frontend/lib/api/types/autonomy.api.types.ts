@@ -18,6 +18,7 @@ export interface AutonomousAction {
 
 export interface ExecuteActionRequest {
   actionId: string;
+  decision: 'approve' | 'reject';
   approvalData?: {
     approvedBy?: string;
     note?: string;
