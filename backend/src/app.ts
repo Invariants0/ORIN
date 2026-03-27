@@ -12,6 +12,7 @@ import workflowRoutes from "./routes/workflow.routes.js";
 import evolutionRoutes from "./routes/evolution.routes.js";
 import multiAgentRoutes from "./routes/multi-agent.routes.js";
 import autonomyRoutes from "./routes/autonomy.routes.js";
+import authRoutes from "./routes/auth.routes.js";
 import { APIError } from "./utils/errors.js";
 
 const app = express();
@@ -44,6 +45,7 @@ app.use("/api/v1/workflows", workflowRoutes);
 app.use("/api/evolution", evolutionRoutes);
 app.use("/api/multi-agent", multiAgentRoutes);
 app.use("/api/autonomy", autonomyRoutes);
+app.use("/api/auth", authRoutes);
 
 // 404 handler
 app.use((req, res) => {
@@ -54,13 +56,14 @@ app.use((req, res) => {
 });
 
 // Global error handler
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction): void => {
   if (err instanceof APIError) {
-    return res.status(err.statusCode).json({
+    res.status(err.statusCode).json({
       code: err.statusCode,
       message: err.message,
       stack: envVars.NODE_ENV === "development" ? err.stack : undefined,
     });
+    return;
   }
 
   logger.error("[Express] Unhandled error:", err);
@@ -70,6 +73,7 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
     message: envVars.NODE_ENV === "development" ? err.message : "Internal server error",
     stack: envVars.NODE_ENV === "development" ? err.stack : undefined,
   });
+  return;
 });
 
 export default app;
