@@ -3,6 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { useOrinStore } from '@/stores/useOrinStore';
+import { useAuth } from '@/hooks/useAuth';
 import {
   Database,
   Mail,
@@ -16,7 +17,8 @@ import {
 import { cn } from '@/lib/utils';
 
 export const Topbar = () => {
-  const { mode, setMode, connections } = useOrinStore();
+  const { mode, setMode, connections, setIsAccountOpen } = useOrinStore();
+  const { user } = useAuth();
 
   return (
     <header className="h-14 bg-white border-b-2 border-black flex items-center justify-between px-5 sticky top-0 z-30 flex-shrink-0">
@@ -87,11 +89,19 @@ export const Topbar = () => {
           </Link>
         </div>
 
-        {/* Avatar */}
-        <div className="w-7 h-7 rounded-full border-2 border-black bg-[#ffe17c] overflow-hidden flex-shrink-0">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="https://picsum.photos/seed/user1/100/100" alt="Avatar" className="w-full h-full object-cover" />
-        </div>
+        {/* Avatar Trigger */}
+        <button 
+          onClick={() => setIsAccountOpen(true)}
+          className="w-10 h-10 rounded-xl border-2 border-black bg-[#ffe17c] overflow-hidden flex-shrink-0 hover:shadow-[3px_3px_0px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all group"
+        >
+          {user?.image ? (
+            <img src={user.image} alt={user.name} className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-[10px] font-black uppercase bg-[#ffe17c]">
+              {user?.name?.[0] || 'U'}
+            </div>
+          )}
+        </button>
       </div>
     </header>
   );
