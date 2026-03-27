@@ -393,7 +393,8 @@ class AdaptiveService {
    */
   async generateBetterTasks(
     goal: string,
-    userId: string
+    userId: string,
+    apiKey?: string
   ): Promise<{
     suggestions: string[];
     improvements: string[];
@@ -435,6 +436,7 @@ Guidelines:
       }>({
         systemPrompt,
         userInput: goal,
+        apiKey,
         schema: {
           suggestions: 'array',
           improvements: 'array'

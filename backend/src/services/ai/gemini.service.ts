@@ -27,13 +27,15 @@ export class GeminiService {
     // All Gemini interactions now go through prompt engine
   }
 
-  async classifyContent(input: string): Promise<ClassificationResult> {
+  async classifyContent(input: string, apiKey?: string): Promise<ClassificationResult> {
     try {
       logger.info("[Gemini] Classifying content via prompt engine");
 
       const response = await promptEngineService.generateFromTemplate<ClassificationResult>(
         PromptTemplate.CONTENT_CLASSIFICATION,
-        input
+        input,
+        undefined,
+        apiKey
       );
 
       if (response.status !== 'success') {
@@ -49,14 +51,15 @@ export class GeminiService {
     }
   }
 
-  async analyzeWithContext(query: string, context: string): Promise<AnalysisResult> {
+  async analyzeWithContext(query: string, context: string, apiKey?: string): Promise<AnalysisResult> {
     try {
       logger.info("[Gemini] Analyzing with context via prompt engine");
 
       const response = await promptEngineService.generateFromTemplate<AnalysisResult>(
         PromptTemplate.CONTEXT_ANALYSIS,
         query,
-        { context }
+        { context },
+        apiKey
       );
 
       if (response.status !== 'success') {
@@ -72,14 +75,15 @@ export class GeminiService {
     }
   }
 
-  async generateDocument(topic: string, context?: string): Promise<DocumentResult> {
+  async generateDocument(topic: string, context?: string, apiKey?: string): Promise<DocumentResult> {
     try {
       logger.info("[Gemini] Generating document via prompt engine");
 
       const response = await promptEngineService.generateFromTemplate<DocumentResult>(
         PromptTemplate.DOCUMENT_GENERATION,
         topic,
-        { topic, context }
+        { topic, context },
+        apiKey
       );
 
       if (response.status !== 'success') {
@@ -95,7 +99,7 @@ export class GeminiService {
     }
   }
 
-  async continueWork(lastSession: string, relatedContext: string): Promise<string> {
+  async continueWork(lastSession: string, relatedContext: string, apiKey?: string): Promise<string> {
     try {
       logger.info("[Gemini] Generating continue work suggestions");
 
@@ -114,6 +118,7 @@ Provide:
 2. Current status
 3. Suggested next steps (3-5 actionable items)`,
         userInput: 'Generate continue work suggestions',
+        apiKey,
         schema: {
           summary: 'string',
           status: 'string',
@@ -138,13 +143,14 @@ Provide:
     }
   }
 
-  async generateContent(prompt: string): Promise<any> {
+  async generateContent(prompt: string, apiKey?: string): Promise<any> {
     try {
       logger.info("[Gemini] Generating content via prompt engine");
 
       const response = await promptEngineService.generateStructuredResponse({
         systemPrompt: 'You are a helpful AI assistant. Provide clear and concise responses.',
         userInput: prompt,
+        apiKey,
         schema: {
           result: 'string',
           analysis: 'string'

@@ -12,7 +12,7 @@ class IntentDetectionService {
     // Intent detection now uses prompt engine
   }
 
-  async detectIntent(userInput: string): Promise<IntentDetectionResult> {
+  async detectIntent(userInput: string, apiKey?: string): Promise<IntentDetectionResult> {
     const startTime = Date.now();
 
     try {
@@ -21,7 +21,9 @@ class IntentDetectionService {
       // Use prompt engine for structured response
       const response = await promptEngineService.generateFromTemplate(
         PromptTemplate.INTENT_CLASSIFICATION,
-        userInput
+        userInput,
+        undefined,
+        apiKey
       );
 
       logger.info('[Intent] Structured response received', { 
@@ -73,9 +75,15 @@ class IntentDetectionService {
         throw new Error('Invalid intent type');
       }
 
-      this.validateIntentStructure(data);
+      // Flatten extractedData if present
+      const normalized = {
+        type: data.type,
+        ...(data.extractedData || {})
+      };
 
-      return data as Intent;
+      this.validateIntentStructure(normalized);
+
+      return normalized as Intent;
     } catch (error: any) {
       logger.error('[Intent] Failed to normalize intent response', { error: error.message, data });
       

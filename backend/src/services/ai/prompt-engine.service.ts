@@ -6,6 +6,7 @@ export interface PromptEngineConfig {
   systemPrompt: string;
   userInput: string;
   schema: Record<string, any>;
+  apiKey?: string;
   maxRetries?: number;
   temperature?: number;
 }
@@ -37,9 +38,11 @@ class PromptEngineService {
     const apiKey = envVars.GEMINI_API_KEY || '';
     this.genAI = new GoogleGenerativeAI(apiKey);
     this.model = this.genAI.getGenerativeModel({
-      model: 'gemini-1.5-flash', // Stable model version
+      model: 'gemini-2.0-flash', // Latest stable 2026 variant
       generationConfig: {
         temperature: this.DEFAULT_TEMPERATURE,
+        maxOutputTokens: 2048,
+        candidateCount: 1
       }
     });
   }
@@ -54,14 +57,17 @@ class PromptEngineService {
     const maxRetries = config.maxRetries ?? this.MAX_RETRIES;
     let lastError: Error | null = null;
 
+    const activeKey = config.apiKey || envVars.GEMINI_API_KEY;
+    const isMock = activeKey === 'dummy-key-for-testing' || !activeKey;
+
     logger.info('[Prompt Engine] Starting structured generation', {
       schemaKeys: Object.keys(config.schema),
       maxRetries,
-      isMock: envVars.GEMINI_API_KEY === 'dummy-key-for-testing' || !envVars.GEMINI_API_KEY
+      isMock
     });
 
     // Mock Mode Support
-    if (envVars.GEMINI_API_KEY === 'dummy-key-for-testing' || !envVars.GEMINI_API_KEY) {
+    if (isMock) {
       return this.generateMockResponse(config);
     }
 
@@ -73,7 +79,20 @@ class PromptEngineService {
         const fullPrompt = this.buildPrompt(config.systemPrompt, config.userInput, config.schema);
 
         // Call Gemini
-        const result = await this.model.generateContent(fullPrompt);
+        let modelToUse = this.model;
+        if (config.apiKey) {
+          const customGenAI = new GoogleGenerativeAI(config.apiKey);
+          modelToUse = customGenAI.getGenerativeModel({
+            model: 'gemini-2.0-flash',
+            generationConfig: {
+              temperature: this.DEFAULT_TEMPERATURE,
+              maxOutputTokens: 2048,
+              candidateCount: 1
+            }
+          });
+        }
+
+        const result = await modelToUse.generateContent(fullPrompt);
         const response = result.response;
         const text = response.text();
 
@@ -134,9 +153,11 @@ class PromptEngineService {
   async generateFromTemplate<T = any>(
     template: PromptTemplate,
     userInput: string,
-    additionalContext?: Record<string, any>
+    additionalContext?: Record<string, any>,
+    apiKey?: string
   ): Promise<StructuredResponse<T>> {
     const config = this.getTemplateConfig(template, userInput, additionalContext);
+    if (apiKey) config.apiKey = apiKey;
     return this.generateStructuredResponse<T>(config);
   }
 
@@ -284,41 +305,18 @@ Return ONLY the JSON object. No markdown, no explanation, no extra text.`;
   private getIntentClassificationTemplate(userInput: string): PromptEngineConfig {
     return {
       systemPrompt: `You are an intent classification system for ORIN, a Context Operating System.
-
+ 
 Your task: Analyze the user input and classify it into ONE of these intents:
-
-1. STORE - User wants to save information, knowledge, notes, or data
-   Examples: "Remember this", "Save that", "Store this info", "Keep track of"
-
-2. QUERY - User wants to retrieve information, ask questions, or search memory
-   Examples: "What did I save about", "Find notes on", "Tell me about", "Search for"
-
-3. GENERATE_DOC - User wants to create a document, report, summary, or structured content
-   Examples: "Create a document about", "Generate a report on", "Write a summary of", "Draft a"
-
-4. OPERATE - User wants to execute a workflow, perform an action, or automate a task
-   Examples: "Execute workflow", "Run the process", "Automate", "Perform action"
-
-5. UNCLEAR - Input is ambiguous, incomplete, or doesn't fit any category`,
+ 
+1. STORE - User wants to save information, knowledge, notes, or data. Data to extract: { content, suggestedTitle, tags, category }
+2. QUERY - User wants to retrieve info or search memory. Data to extract: { question, searchTerms }
+3. GENERATE_DOC - User wants to create a document. Data to extract: { topic, documentType, requirements }
+4. OPERATE - User wants to execute a workflow. Data to extract: { action, parameters }
+5. UNCLEAR - Ambiguous or fits none. Data to extract: { reason, clarificationNeeded }`,
       userInput,
       schema: {
         type: 'string',
-        content: 'string',
-        suggestedTitle: 'string',
-        tags: 'array',
-        category: 'string',
-        question: 'string',
-        searchTerms: 'array',
-        contextNeeded: 'boolean',
-        documentType: 'string',
-        topic: 'string',
-        requirements: 'array',
-        targetAudience: 'string',
-        action: 'string',
-        parameters: 'object',
-        requiresConfirmation: 'boolean',
-        reason: 'string',
-        clarificationNeeded: 'array'
+        extractedData: 'object'
       }
     };
   }
