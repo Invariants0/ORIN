@@ -34,9 +34,10 @@ class PromptEngineService {
   private readonly DEFAULT_TEMPERATURE = 0.7;
 
   constructor() {
-    this.genAI = new GoogleGenerativeAI(envVars.GEMINI_API_KEY || '');
-    this.model = this.genAI.getGenerativeModel({ 
-      model: 'gemini-2.5-flash', // Updated to stable model
+    const apiKey = envVars.GEMINI_API_KEY || '';
+    this.genAI = new GoogleGenerativeAI(apiKey);
+    this.model = this.genAI.getGenerativeModel({
+      model: 'gemini-2.5-flash', // Stable model version
       generationConfig: {
         temperature: this.DEFAULT_TEMPERATURE,
       }
@@ -55,8 +56,14 @@ class PromptEngineService {
 
     logger.info('[Prompt Engine] Starting structured generation', {
       schemaKeys: Object.keys(config.schema),
-      maxRetries
+      maxRetries,
+      isMock: envVars.GEMINI_API_KEY === 'dummy-key-for-testing' || !envVars.GEMINI_API_KEY
     });
+
+    // Mock Mode Support
+    if (envVars.GEMINI_API_KEY === 'dummy-key-for-testing' || !envVars.GEMINI_API_KEY) {
+      return this.generateMockResponse(config);
+    }
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
@@ -70,9 +77,9 @@ class PromptEngineService {
         const response = result.response;
         const text = response.text();
 
-        logger.debug('[Prompt Engine] Raw response received', { 
+        logger.debug('[Prompt Engine] Raw response received', {
           responseLength: text.length,
-          attempt: attempt + 1 
+          attempt: attempt + 1
         });
 
         // Parse and validate JSON
@@ -169,8 +176,8 @@ class PromptEngineService {
       }
     }
 
-    logger.debug('[Prompt Engine] Schema validation passed', { 
-      validatedFields: requiredFields.length 
+    logger.debug('[Prompt Engine] Schema validation passed', {
+      validatedFields: requiredFields.length
     });
   }
 
@@ -181,7 +188,7 @@ class PromptEngineService {
     try {
       // Remove markdown code blocks
       let cleaned = text.trim();
-      
+
       // Try to extract from ```json ... ``` or ``` ... ```
       const jsonMatch = cleaned.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
       if (jsonMatch) {
@@ -201,7 +208,7 @@ class PromptEngineService {
       return parsed;
 
     } catch (error: any) {
-      logger.error('[Prompt Engine] JSON extraction failed', { 
+      logger.error('[Prompt Engine] JSON extraction failed', {
         error: error.message,
         textPreview: text.substring(0, 200)
       });
@@ -213,8 +220,8 @@ class PromptEngineService {
    * Build complete prompt with system instructions and schema
    */
   private buildPrompt(
-    systemPrompt: string, 
-    userInput: string, 
+    systemPrompt: string,
+    userInput: string,
     schema: Record<string, any>
   ): string {
     const schemaDescription = this.generateSchemaDescription(schema);
@@ -369,7 +376,7 @@ Provide a comprehensive answer with:
    * Template: Document Generation
    */
   private getDocumentGenerationTemplate(
-    userInput: string, 
+    userInput: string,
     additionalContext?: Record<string, any>
   ): PromptEngineConfig {
     const topic = additionalContext?.topic || userInput;
@@ -394,6 +401,48 @@ The content should be comprehensive and well-organized.`,
         content: 'string',
         sections: 'array',
         metadata: 'object'
+      }
+    };
+  }
+
+  /**
+   * Simple mock response generator for development without API keys
+   */
+  private async generateMockResponse<T>(config: PromptEngineConfig): Promise<StructuredResponse<T>> {
+    const mockData: any = {};
+
+    for (const [key, type] of Object.entries(config.schema)) {
+      if (type === 'string') {
+        if (key === 'type') mockData[key] = 'QUERY';
+        else if (key === 'intent') mockData[key] = 'QUERY';
+        else if (key === 'suggestedTitle') mockData[key] = 'Simulated Response';
+        else if (key === 'title') mockData[key] = 'Mock Title';
+        else if (key === 'summary') mockData[key] = 'This is a simulated AI response used because no API key is set.';
+        else if (key === 'content') mockData[key] = 'The AI is currently in Mock Mode. Please set your GEMINI_API_KEY in the .env file for real capabilities.';
+        else if (key === 'output') mockData[key] = 'AI is in Mock Mode. Set your GEMINI_API_KEY in .env to enable real processing.';
+        else if (key === 'status') mockData[key] = 'completed';
+        else mockData[key] = `Mock ${key} value`;
+      } else if (type === 'array') {
+        mockData[key] = [`Mock ${key} item 1`, `Mock ${key} item 2`];
+      } else if (type === 'object') {
+        mockData[key] = { mock: true };
+      } else if (type === 'boolean') {
+        mockData[key] = true;
+      } else if (type === 'number') {
+        mockData[key] = 0.95;
+      }
+    }
+
+    // Artificial delay to simulate network
+    await this.sleep(400);
+
+    return {
+      status: 'success',
+      data: mockData as T,
+      metadata: {
+        attempts: 1,
+        processingTimeMs: 400,
+        model: 'mock-mode'
       }
     };
   }

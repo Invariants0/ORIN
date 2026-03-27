@@ -72,7 +72,7 @@ class SessionService {
     try {
       logger.info('[Session] Creating new session', { userId: input.userId });
 
-      const session = await prisma.session.create({
+      const session = await prisma.chatSession.create({
         data: {
           userId: input.userId,
           title: input.title || null,
@@ -117,7 +117,7 @@ class SessionService {
 
       await prisma.message.create({
         data: {
-          sessionId: input.sessionId,
+          chatSessionId: input.sessionId,
           role: input.role,
           content: input.content,
           intent: input.intent || null,
@@ -126,7 +126,7 @@ class SessionService {
       });
 
       // Update session's updatedAt timestamp
-      await prisma.session.update({
+      await prisma.chatSession.update({
         where: { id: input.sessionId },
         data: { updatedAt: new Date() }
       });
@@ -151,7 +151,7 @@ class SessionService {
     try {
       logger.debug('[Session] Fetching session', { sessionId });
 
-      const session = await prisma.session.findUnique({
+      const session = await prisma.chatSession.findUnique({
         where: { id: sessionId },
         include: {
           messages: {
@@ -190,7 +190,7 @@ class SessionService {
     try {
       logger.debug('[Session] Fetching recent session', { userId });
 
-      const session = await prisma.session.findFirst({
+      const session = await prisma.chatSession.findFirst({
         where: { userId },
         orderBy: {
           updatedAt: 'desc'
@@ -233,7 +233,7 @@ class SessionService {
     try {
       logger.debug('[Session] Fetching user sessions', { userId, limit });
 
-      const sessions = await prisma.session.findMany({
+      const sessions = await prisma.chatSession.findMany({
         where: { userId },
         orderBy: {
           updatedAt: 'desc'
@@ -274,7 +274,7 @@ class SessionService {
     try {
       logger.debug('[Session] Updating session', { sessionId, updates });
 
-      await prisma.session.update({
+      await prisma.chatSession.update({
         where: { id: sessionId },
         data: updates
       });
@@ -297,7 +297,7 @@ class SessionService {
     try {
       logger.info('[Session] Deleting session', { sessionId });
 
-      await prisma.session.delete({
+      await prisma.chatSession.delete({
         where: { id: sessionId }
       });
 
