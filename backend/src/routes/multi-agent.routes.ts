@@ -1,7 +1,7 @@
 // Multi-Agent Routes - Phase 20
 
 import { Router } from 'express';
-import * as multiAgentController from '../controllers/multi-agent.controller.js';
+import * as multiAgentController from '@/controllers/multi-agent.controller.js';
 
 const router = Router();
 

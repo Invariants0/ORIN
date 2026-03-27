@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import * as autonomyController from '../controllers/autonomy.controller.js';
-import { asyncHandler } from '../handlers/async.handler.js';
+import * as autonomyController from '@/controllers/autonomy.controller.js';
+import { asyncHandler } from '@/handlers/async.handler.js';
 
 const router = Router();
 

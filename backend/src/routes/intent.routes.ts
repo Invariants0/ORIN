@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { detectIntent, batchDetectIntents } from '../controllers/intent.controller.js';
+import { detectIntent, batchDetectIntents } from '@/controllers/intent.controller.js';
 
 const router = Router();
 
