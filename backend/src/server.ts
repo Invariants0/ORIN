@@ -3,13 +3,13 @@ import dotenv from "dotenv";
 // Load environment variables first
 dotenv.config();
 
-import app from "./app.js";
-import db from "./config/database.js";
-import envVars from "./config/envVars.js";
-import logger from "./config/logger.js";
-import { websocketGateway } from "./services/websocket.gateway.js";
-import { monitoringService } from "./services/monitoring.service.js";
-import { workflowRunnerService } from "./services/workflow-runner.service.js";
+import app from "@/app.js";
+import db from "@/config/database.js";
+import envVars from "@/config/envVars.js";
+import logger from "@/config/logger.js";
+import { websocketGateway } from "@/services/infrastructure/websocket.gateway.js";
+import { monitoringService } from "@/services/infrastructure/monitoring.service.js";
+import { workflowRunnerService } from "@/services/workflow/workflow-runner.service.js";
 
 async function startServer() {
   try {
