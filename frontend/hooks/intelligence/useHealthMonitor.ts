@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { HealthCheck } from '@/lib/types/intelligence.types';
 import { queryKeys } from '../queries/query-keys';

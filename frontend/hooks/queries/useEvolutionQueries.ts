@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { EvolutionApi } from '@/lib/api/endpoints/evolution.api';
-import type { ObjectiveFunction, AgentOptimizationMetrics, OptimizationRun, PatternInsight } from '@/lib/api/types/evolution.api.types';
+import type { ObjectiveFunction, AgentOptimizationMetrics, PatternInsight } from '@/lib/api/types/evolution.api.types';
 import { queryKeys } from './query-keys';
 import { toast } from 'sonner';
 

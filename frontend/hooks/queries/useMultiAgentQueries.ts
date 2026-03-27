@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { MultiAgentApi } from '@/lib/api/endpoints/multi-agent.api';
-import type { AgentStatus, MultiAgentSystemStats, InterAgentMessage, AgentQueryRequest, AgentQueryResponse } from '@/lib/api/types/multi-agent.api.types';
+import type { AgentStatus, MultiAgentSystemStats, InterAgentMessage, AgentQueryRequest } from '@/lib/api/types/multi-agent.api.types';
 import { queryKeys } from './query-keys';
 import { toast } from 'sonner';
 
