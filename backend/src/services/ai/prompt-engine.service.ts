@@ -35,10 +35,11 @@ class PromptEngineService {
   private readonly DEFAULT_TEMPERATURE = 0.7;
 
   constructor() {
-    const apiKey = envVars.GEMINI_API_KEY || '';
+    const apiKey = envVars.GEMINI_API_KEY 
+    const modelName = envVars.GEMINI_MODEL 
     this.genAI = new GoogleGenerativeAI(apiKey);
     this.model = this.genAI.getGenerativeModel({
-      model: 'gemini-2.0-flash', // Latest stable 2026 variant
+      model: modelName,
       generationConfig: {
         temperature: this.DEFAULT_TEMPERATURE,
         maxOutputTokens: 2048,
@@ -83,7 +84,7 @@ class PromptEngineService {
         if (config.apiKey) {
           const customGenAI = new GoogleGenerativeAI(config.apiKey);
           modelToUse = customGenAI.getGenerativeModel({
-            model: 'gemini-2.0-flash',
+            model: envVars.GEMINI_MODEL,
             generationConfig: {
               temperature: this.DEFAULT_TEMPERATURE,
               maxOutputTokens: 2048,
@@ -118,7 +119,7 @@ class PromptEngineService {
           metadata: {
             attempts: attempt + 1,
             processingTimeMs,
-            model: 'gemini-1.5-flash'
+            model: envVars.GEMINI_MODEL
           }
         };
 

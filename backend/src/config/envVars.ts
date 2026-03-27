@@ -23,6 +23,7 @@ const EnvConfigSchema = z.object({
   
   // AI Services (required for full functionality)
   GEMINI_API_KEY: z.string().optional(),
+  GEMINI_MODEL: z.string().optional(),
   
   // Notion Integration (required for full functionality)
   NOTION_API_KEY: z.string().optional(),
@@ -70,6 +71,7 @@ try {
     ...parsed,
     DATABASE_URL: parsed.DATABASE_URL || "file:./dev.db",
     BETTER_AUTH_URL: parsed.BETTER_AUTH_URL || "http://localhost:8000/api/auth",
+    GEMINI_MODEL: parsed.GEMINI_MODEL || "gemini-2.5-flash",
     isReady: missingRequired.length === 0,
     missingRequired,
   };
