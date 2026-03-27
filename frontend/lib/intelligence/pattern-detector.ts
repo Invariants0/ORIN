@@ -57,7 +57,6 @@ export class PatternDetector {
     }
 
     const runs = history.runs;
-    const recentRuns = runs.slice(-10); // Last 10 runs
 
     // Calculate statistics
     const totalRuns = runs.length;
@@ -158,6 +157,7 @@ export class PatternDetector {
    * Detect long-running steps
    */
   private detectLongRunningSteps(runs: WorkflowRun[]): string[] {
+    void runs;
     // This would require step-level data
     // For now, return empty array
     return [];
@@ -197,8 +197,8 @@ export class PatternDetector {
 
     // Return errors that occurred 2+ times
     return Array.from(errorCounts.entries())
-      .filter(([_, count]) => count >= 2)
-      .map(([error, _]) => error);
+      .filter(([, count]) => count >= 2)
+      .map(([error]) => error);
   }
 
   /**
