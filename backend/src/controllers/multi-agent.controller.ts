@@ -1,8 +1,8 @@
 // Multi-Agent Controller - Phase 20
 
 import { Request, Response } from 'express';
-import multiAgentOrchestratorService from '../services/multi-agent-orchestrator.service.js';
-import logger from '../config/logger.js';
+import multiAgentOrchestratorService from '@/services/orchestration/multi-agent-orchestrator.service.js';
+import logger from '@/config/logger.js';
 
 /**
  * Initialize multi-agent system

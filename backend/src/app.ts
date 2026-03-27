@@ -3,17 +3,17 @@ import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 
-import envVars from "./config/envVars.js";
-import logger from "./config/logger.js";
-import healthRoutes from "./routes/health.routes.js";
-import chatRoutes from "./routes/chat.routes.js";
-import intentRoutes from "./routes/intent.routes.js";
-import workflowRoutes from "./routes/workflow.routes.js";
-import evolutionRoutes from "./routes/evolution.routes.js";
-import multiAgentRoutes from "./routes/multi-agent.routes.js";
-import autonomyRoutes from "./routes/autonomy.routes.js";
-import authRoutes from "./routes/auth.routes.js";
-import { APIError } from "./utils/errors.js";
+import envVars from "@/config/envVars.js";
+import logger from "@/config/logger.js";
+import healthRoutes from "@/routes/health.routes.js";
+import chatRoutes from "@/routes/chat.routes.js";
+import intentRoutes from "@/routes/intent.routes.js";
+import workflowRoutes from "@/routes/workflow.routes.js";
+import evolutionRoutes from "@/routes/evolution.routes.js";
+import multiAgentRoutes from "@/routes/multi-agent.routes.js";
+import autonomyRoutes from "@/routes/autonomy.routes.js";
+import authRoutes from "@/routes/auth.routes.js";
+import { APIError } from "@/utils/errors.js";
 
 const app = express();
 

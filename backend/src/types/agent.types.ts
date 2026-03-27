@@ -5,7 +5,8 @@ export enum AgentType {
   OPTIMIZATION = 'optimization',
   RECOVERY = 'recovery',
   PLANNING = 'planning',
-  USER_ASSISTANT = 'user_assistant'
+  USER_ASSISTANT = 'user_assistant',
+  COORDINATOR = 'coordinator'
 }
 
 export enum AgentStatus {
@@ -35,7 +36,7 @@ export enum AuthorityLevel {
 export interface AgentMessage {
   id: string;
   from: AgentType;
-  to: AgentType | 'broadcast' | 'coordinator';
+  to: AgentType | 'broadcast';
   type: 'request' | 'response' | 'notification' | 'proposal' | 'alert';
   priority: MessagePriority;
   payload: any;

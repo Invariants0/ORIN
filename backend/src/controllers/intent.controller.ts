@@ -1,8 +1,8 @@
 import { Request, Response } from 'express';
-import intentService from '../services/intent.service.js';
-import logger from '../config/logger.js';
-import { APIError } from '../utils/errors.js';
-import catchAsync from '../handlers/async.handler.js';
+import intentService from '@/services/ai/intent.service.js';
+import logger from '@/config/logger.js';
+import { APIError } from '@/utils/errors.js';
+import catchAsync from '@/handlers/async.handler.js';
 
 export const detectIntent = catchAsync(async (req: Request, res: Response) => {
   const { input } = req.body;

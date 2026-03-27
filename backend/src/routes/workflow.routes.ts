@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { workflowController } from '../controllers/workflow.controller';
-import { asyncHandler } from '../handlers/async.handler';
+import { workflowController } from '@/controllers/workflow.controller.js';
+import { asyncHandler } from '@/handlers/async.handler.js';
 
 const router = Router();
 

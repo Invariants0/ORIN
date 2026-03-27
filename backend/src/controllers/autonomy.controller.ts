@@ -1,10 +1,10 @@
 import { Request, Response } from 'express';
-import { autonomyService } from '../services/autonomy.service';
-import { actionExecutorService } from '../services/action-executor.service';
-import { policyEngineService } from '../services/policy-engine.service';
-import { learningService } from '../services/learning.service';
-import { AutonomyLevel } from '../types/autonomy.types';
-import { logger } from '../config/logger';
+import { autonomyService } from '@/services/workflow/autonomy.service.js';
+import { actionExecutorService } from '@/services/workflow/action-executor.service.js';
+import { policyEngineService } from '@/services/infrastructure/policy-engine.service.js';
+import { learningService } from '@/services/ai/learning.service.js';
+import { AutonomyLevel } from '@/types/autonomy.types.js';
+import logger from '@/config/logger.js';
 
 /**
  * Configure user autonomy settings
@@ -14,15 +14,15 @@ export const configureAutonomy = async (req: Request, res: Response) => {
     const { userId, level, config } = req.body;
 
     if (!userId || !level) {
-      return res.status(400).json({ 
-        error: 'userId and level are required' 
+      return res.status(400).json({
+        error: 'userId and level are required'
       });
     }
 
     // Validate level
     if (!Object.values(AutonomyLevel).includes(level)) {
-      return res.status(400).json({ 
-        error: 'Invalid autonomy level' 
+      return res.status(400).json({
+        error: 'Invalid autonomy level'
       });
     }
 
@@ -52,11 +52,11 @@ export const getAutonomyConfig = async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
 
-    const config = autonomyService.getConfig(userId);
+    const config = autonomyService.getConfig(userId as string);
 
     if (!config) {
-      return res.status(404).json({ 
-        error: 'User autonomy not configured' 
+      return res.status(404).json({
+        error: 'User autonomy not configured'
       });
     }
 
@@ -92,7 +92,7 @@ export const approveAction = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    const execution = await actionExecutorService.approveAction(id);
+    const execution = await actionExecutorService.approveAction(id as string);
 
     res.json({
       success: true,
@@ -112,7 +112,7 @@ export const undoAction = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    await actionExecutorService.undoAction(id);
+    await actionExecutorService.undoAction(id as string);
 
     res.json({
       success: true,
@@ -170,7 +170,7 @@ export const togglePolicy = async (req: Request, res: Response) => {
     const { id } = req.params;
     const { enabled } = req.body;
 
-    const success = policyEngineService.togglePolicy(id, enabled);
+    const success = policyEngineService.togglePolicy(id as string, enabled);
 
     if (!success) {
       return res.status(404).json({ error: 'Policy not found' });
@@ -209,7 +209,7 @@ export const getRecommendations = async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
 
-    const recommendations = autonomyService.getRecommendations(userId);
+    const recommendations = autonomyService.getRecommendations(userId as string);
 
     res.json({ recommendations });
 

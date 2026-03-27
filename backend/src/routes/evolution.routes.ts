@@ -1,7 +1,7 @@
 // Evolution Routes - Phase 21
 
 import { Router } from 'express';
-import * as evolutionController from '../controllers/evolution.controller.js';
+import * as evolutionController from '@/controllers/evolution.controller.js';
 
 const router = Router();
 
