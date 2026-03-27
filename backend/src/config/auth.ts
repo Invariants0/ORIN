@@ -16,18 +16,30 @@ export const auth = betterAuth({
   database: prismaAdapter(db, {
     provider: "sqlite", // or "postgresql", based on schema.prisma
   }),
+  user: {
+    additionalFields: {
+      geminiKey: {
+        type: "string",
+        required: false,
+      },
+      notionToken: {
+        type: "string",
+        required: false,
+      }
+    }
+  },
   emailAndPassword: {
     enabled: true,
   },
   socialProviders: {
     google: {
-      clientId: process.env.GOOGLE_CLIENT_ID || "mock-client",
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET || "mock-secret",
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
       redirectURI: process.env.GOOGLE_CALLBACK_URL,
     },
     github: {
-      clientId: process.env.GITHUB_CLIENT_ID || "mock-client",
-      clientSecret: process.env.GITHUB_CLIENT_SECRET || "mock-secret",
+      clientId: process.env.GITHUB_CLIENT_ID,
+      clientSecret: process.env.GITHUB_CLIENT_SECRET,
       redirectURI: process.env.GITHUB_CALLBACK_URL,
     },
   },
