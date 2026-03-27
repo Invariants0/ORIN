@@ -309,7 +309,7 @@ export default function LandingPage() {
       </section>
 
       {/* Tech Stack */}
-      <section className="py-24 px-8 bg-white overflow-hidden">
+      <section id="tech-stack" className="py-24 px-8 bg-white overflow-hidden">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-20">
             <h2 className="text-5xl md:text-7xl font-extrabold tracking-tighter uppercase mb-4">
@@ -323,8 +323,8 @@ export default function LandingPage() {
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
             {[
               { name: 'Next.js 16', desc: 'Framework', icon: Layout },
-              { name: 'Gemini 1.5', desc: 'AI Engine', icon: Brain },
-              { name: 'Notion API', desc: 'Memory Store', icon: Database },
+              { name: 'Gemini 2.5 Flash', desc: 'AI Engine', icon: Brain },
+              { name: 'Notion MCP', desc: 'Memory Store', icon: Database },
               { name: 'Tailwind 4', desc: 'Styling', icon: Zap },
               { name: 'Zustand', desc: 'State', icon: Layers },
               { name: 'Framer', desc: 'Motion', icon: Star },

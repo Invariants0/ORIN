@@ -28,6 +28,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { authClient } from '@/lib/auth';
+import { API_BASE_URL } from '@/lib/constants';
 
 type SettingsTab = 'profile' | 'connections' | 'api' | 'notifications' | 'appearance' | 'privacy';
 
@@ -50,6 +51,7 @@ export default function SettingsPage() {
   const [email, setEmail] = useState('');
   const [geminiKey, setGeminiKey] = useState('');
   const [notionKey, setNotionKey] = useState('');
+  const notionConnected = Boolean(notionKey || (storeUser as any)?.notionToken);
 
   // Update local state when user session loads
   React.useEffect(() => {
@@ -101,6 +103,35 @@ export default function SettingsPage() {
       console.error("Failed to save settings", err);
       toast.error('Failed to save changes', {
         description: 'Please check your connection and try again.',
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleNotionConnect = () => {
+    window.location.href = `${API_BASE_URL}/notion/oauth/start`;
+  };
+
+  const handleNotionDisconnect = async () => {
+    try {
+      setIsSaving(true);
+      await fetch(`${API_BASE_URL}/notion/oauth/disconnect`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      await authClient.updateUser({ notionToken: '' } as any);
+      if (storeUser) {
+        setStoreUser({ ...storeUser, notionToken: '' });
+      }
+      setNotionKey('');
+      toast.success('Notion disconnected', {
+        description: 'Your Notion connection has been removed.',
+      });
+    } catch (err) {
+      console.error("Failed to disconnect Notion", err);
+      toast.error('Failed to disconnect Notion', {
+        description: 'Please try again.',
       });
     } finally {
       setIsSaving(false);
@@ -245,6 +276,7 @@ export default function SettingsPage() {
                           desc: 'Read and write to your Notion workspace — the core memory store.',
                           color: 'bg-[#b7c6c2]',
                           docsUrl: 'https://developers.notion.com',
+                          isNotion: true,
                         },
                         {
                           key: 'email' as const,
@@ -264,7 +296,7 @@ export default function SettingsPage() {
                         },
                       ].map((conn) => {
                         const Icon = conn.icon;
-                        const isConnected = connections[conn.key];
+                        const isConnected = conn.isNotion ? notionConnected : connections[conn.key];
                         return (
                           <Card
                             key={conn.key}
@@ -290,7 +322,17 @@ export default function SettingsPage() {
                               <Button
                                 variant={isConnected ? 'outline' : 'secondary'}
                                 size="sm"
-                                onClick={() => updateConnection(conn.key, !isConnected)}
+                                onClick={() => {
+                                  if (conn.isNotion) {
+                                    if (isConnected) {
+                                      handleNotionDisconnect();
+                                    } else {
+                                      handleNotionConnect();
+                                    }
+                                    return;
+                                  }
+                                  updateConnection(conn.key, !isConnected);
+                                }}
                               >
                                 {isConnected ? 'Disconnect' : 'Connect'}
                               </Button>
@@ -323,13 +365,14 @@ export default function SettingsPage() {
                           linkText: 'Get key →',
                         },
                         {
-                          label: 'Notion API Key',
-                          placeholder: 'secret_...',
+                          label: 'Notion Token (Managed by OAuth)',
+                          placeholder: 'Connected via OAuth',
                           value: notionKey,
                           onChange: setNotionKey,
-                          desc: 'Required for Notion read/write access.',
+                          desc: 'Use the Connections tab to connect Notion via OAuth.',
                           link: 'https://www.notion.so/my-integrations',
-                          linkText: 'Create integration →',
+                          linkText: 'Manage integrations →',
+                          disabled: true,
                         },
                       ].map((field) => (
                         <Card key={field.label} variant="white" className="p-6 space-y-4">
@@ -344,6 +387,7 @@ export default function SettingsPage() {
                             placeholder={field.placeholder}
                             value={field.value}
                             onChange={(e) => field.onChange(e.target.value)}
+                            disabled={(field as any).disabled}
                           />
                           <p className="text-xs font-bold text-black/40">{field.desc}</p>
                         </Card>
