@@ -5,11 +5,27 @@ export interface ChatMessageRequest {
   sessionId?: string | null;
 }
 
+export interface ActionDetails {
+  taskId?: string;
+  workflowId?: string;
+  status?: string;
+  message?: string;
+  result?: unknown;
+  error?: string;
+  [key: string]: unknown;
+}
+
+export interface Action {
+  type: string;
+  status: string;
+  details: ActionDetails;
+}
+
 export interface ChatMessageResponse {
   intent: string;
   output: string;
   references?: string[];
-  actions?: Array<{ type: string; status: string; details: any }>;
+  actions?: Action[];
   metadata: {
     processingTimeMs: number;
     confidence: number;
