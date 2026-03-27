@@ -18,11 +18,6 @@ export const queryKeys = {
     statistics: () => [...queryKeys.workflows.all, 'statistics'] as const,
     metrics: () => [...queryKeys.workflows.all, 'metrics'] as const,
   },
-  commands: {
-    all: ['commands'] as const,
-    history: () => [...queryKeys.commands.all, 'history'] as const,
-    logs: (id: string) => [...queryKeys.commands.all, 'logs', id] as const,
-  },
   autonomy: {
     all: ['autonomy'] as const,
     actions: () => [...queryKeys.autonomy.all, 'actions'] as const,
