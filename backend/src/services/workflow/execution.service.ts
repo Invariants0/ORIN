@@ -41,7 +41,7 @@ class ExecutionService {
   /**
    * Execute the next pending task
    */
-  async executeNextTask(input: ExecuteNextTaskInput): Promise<ExecutionPlan> {
+  async executeNextTask(input: ExecuteNextTaskInput, apiKey?: string): Promise<ExecutionPlan> {
     const startTime = Date.now();
 
     try {
@@ -80,7 +80,7 @@ class ExecutionService {
       });
 
       // Step 4: Generate execution plan using Prompt Engine
-      const plan = await this.generateExecutionPlan(nextTask);
+      const plan = await this.generateExecutionPlan(nextTask, apiKey);
 
       logger.info('[Execution] Execution plan generated', {
         taskId: nextTask.id,
@@ -159,7 +159,7 @@ class ExecutionService {
   /**
    * Generate execution plan using Prompt Engine
    */
-  private async generateExecutionPlan(task: StoredTask): Promise<{
+  private async generateExecutionPlan(task: StoredTask, apiKey?: string): Promise<{
     approach: string;
     steps: string[];
     estimatedTime: string;
@@ -212,6 +212,7 @@ Example output structure:
     }>({
       systemPrompt,
       userInput: `Generate execution plan for: ${task.title}`,
+      apiKey,
       schema: {
         approach: 'string',
         steps: 'array',

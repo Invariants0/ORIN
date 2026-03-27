@@ -45,7 +45,7 @@ class TaskService {
   /**
    * Decompose a goal into actionable tasks
    */
-  async decomposeTask(input: DecomposeTaskInput): Promise<TaskDecompositionResult> {
+  async decomposeTask(input: DecomposeTaskInput, apiKey?: string): Promise<TaskDecompositionResult> {
     const startTime = Date.now();
 
     try {
@@ -56,7 +56,7 @@ class TaskService {
       });
 
       // Step 1: Get adaptive learning insights
-      const betterTasks = await adaptiveService.generateBetterTasks(input.input, input.userId);
+      const betterTasks = await adaptiveService.generateBetterTasks(input.input, input.userId, apiKey);
 
       if (betterTasks.suggestions.length > 0) {
         logger.info('[Task] Adaptive suggestions available', {
@@ -66,7 +66,7 @@ class TaskService {
       }
 
       // Step 2: Use Prompt Engine to decompose task
-      const decomposition = await this.generateTaskDecomposition(input.input, betterTasks);
+      const decomposition = await this.generateTaskDecomposition(input.input, betterTasks, apiKey);
 
       logger.info('[Task] Task decomposition generated', {
         goal: decomposition.goal,
@@ -125,7 +125,8 @@ class TaskService {
    */
   private async generateTaskDecomposition(
     input: string,
-    betterTasks?: { suggestions: string[]; improvements: string[] }
+    betterTasks?: { suggestions: string[]; improvements: string[] },
+    apiKey?: string
   ): Promise<{
     goal: string;
     tasks: TaskItem[];
@@ -181,6 +182,7 @@ Example task structure:
     }>({
       systemPrompt,
       userInput: input,
+      apiKey,
       schema: {
         goal: 'string',
         tasks: 'array'

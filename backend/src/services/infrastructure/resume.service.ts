@@ -33,7 +33,7 @@ class ResumeService {
   /**
    * Resume work from the most recent session
    */
-  async resumeWork(userId: string, sessionId?: string): Promise<ResumeWorkResult> {
+  async resumeWork(userId: string, sessionId?: string, apiKey?: string): Promise<ResumeWorkResult> {
     const startTime = Date.now();
 
     try {
@@ -67,7 +67,7 @@ class ResumeService {
       });
 
       // Step 3: Generate resume summary using Prompt Engine
-      const resumeSummary = await this.generateResumeSummary(session, analysis);
+      const resumeSummary = await this.generateResumeSummary(session, analysis, apiKey);
 
       logger.info('[Resume] Resume summary generated', {
         summaryLength: resumeSummary.summary.length,
@@ -219,7 +219,8 @@ class ResumeService {
    */
   private async generateResumeSummary(
     session: SessionWithMessages,
-    analysis: MessageAnalysis
+    analysis: MessageAnalysis,
+    apiKey?: string
   ): Promise<{
     summary: string;
     currentState: string;
@@ -263,6 +264,7 @@ Be specific and actionable. Base everything on the actual conversation history.`
     }>({
       systemPrompt,
       userInput: 'Generate resume summary',
+      apiKey,
       schema: {
         summary: 'string',
         currentState: 'string',

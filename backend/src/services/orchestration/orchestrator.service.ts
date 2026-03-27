@@ -9,6 +9,7 @@ import executionService from '../workflow/execution.service.js';
 import metaOrchestratorService, { StrategyType } from './meta-orchestrator.service.js';
 import logger from '../../config/logger.js';
 import envVars from '../../config/envVars.js';
+import db from '../../config/database.js';
 import { IntentType, StoreIntent, QueryIntent, GenerateDocIntent, OperateIntent } from '../../types/intent.types.js';
 
 export interface OrchestratorResponse {
@@ -33,10 +34,14 @@ class OrchestratorService {
     const servicesUsed: string[] = ['intent-detection'];
 
     try {
+      const user = await db.user.findUnique({ where: { id: userId } });
+      const apiKey = user?.geminiKey || undefined;
+
       logger.info('[Orchestrator] Processing user input', { 
         userId, 
         sessionId: sessionId || 'none',
-        inputLength: input.length 
+        inputLength: input.length,
+        hasUserKey: !!apiKey
       });
 
       // Step 0: Use Meta-Orchestrator to decide strategy
@@ -52,21 +57,21 @@ class OrchestratorService {
       switch (decision.strategy) {
         case StrategyType.RESUME:
           logger.info('[Orchestrator] Executing RESUME strategy');
-          return await this.handleResumeRequest(userId, sessionId, servicesUsed, startTime);
+          return await this.handleResumeRequest(userId, sessionId, servicesUsed, startTime, apiKey);
 
         case StrategyType.EXECUTE:
           logger.info('[Orchestrator] Executing EXECUTE strategy');
           if (executionService.isCompletionRequest(input) && sessionId) {
             return await this.handleTaskCompletion(userId, sessionId, servicesUsed, startTime);
           } else if (sessionId) {
-            return await this.handleTaskExecution(userId, sessionId, servicesUsed, startTime);
+            return await this.handleTaskExecution(userId, sessionId, servicesUsed, startTime, apiKey);
           }
           break;
 
         case StrategyType.DECOMPOSE:
           logger.info('[Orchestrator] Executing DECOMPOSE strategy');
           if (sessionId) {
-            return await this.handleTaskDecomposition(input, userId, sessionId, servicesUsed, startTime);
+            return await this.handleTaskDecomposition(input, userId, sessionId, servicesUsed, startTime, apiKey);
           }
           break;
 
@@ -132,7 +137,7 @@ class OrchestratorService {
       }
 
       // Step 1: Detect Intent
-      const intentResult = await intentService.detectIntent(input);
+      const intentResult = await intentService.detectIntent(input, apiKey);
       logger.info('[Orchestrator] Intent detected', { 
         intent: intentResult.intent.type, 
         confidence: intentResult.confidence 
@@ -143,19 +148,19 @@ class OrchestratorService {
 
       switch (intentResult.intent.type) {
         case IntentType.STORE:
-          response = await this.handleStoreIntent(intentResult.intent as StoreIntent, userId, servicesUsed);
+          response = await this.handleStoreIntent(intentResult.intent as StoreIntent, userId, servicesUsed, apiKey);
           break;
 
         case IntentType.QUERY:
-          response = await this.handleQueryIntent(intentResult.intent as QueryIntent, userId, servicesUsed);
+          response = await this.handleQueryIntent(intentResult.intent as QueryIntent, userId, servicesUsed, apiKey);
           break;
 
         case IntentType.GENERATE_DOC:
-          response = await this.handleGenerateDocIntent(intentResult.intent as GenerateDocIntent, userId, servicesUsed);
+          response = await this.handleGenerateDocIntent(intentResult.intent as GenerateDocIntent, userId, servicesUsed, apiKey);
           break;
 
         case IntentType.OPERATE:
-          response = await this.handleOperateIntent(intentResult.intent as OperateIntent, userId, servicesUsed);
+          response = await this.handleOperateIntent(intentResult.intent as OperateIntent, userId, servicesUsed, apiKey);
           break;
 
         case IntentType.UNCLEAR:
@@ -208,14 +213,15 @@ class OrchestratorService {
   private async handleStoreIntent(
     intent: StoreIntent, 
     userId: string, 
-    servicesUsed: string[]
+    servicesUsed: string[],
+    apiKey?: string
   ): Promise<OrchestratorResponse> {
     logger.info('[Orchestrator] Handling STORE intent', { userId });
     servicesUsed.push('gemini', 'notion-write');
 
     try {
       // Classify content using Gemini
-      const classification = await geminiService.classifyContent(intent.content);
+      const classification = await geminiService.classifyContent(intent.content, apiKey);
 
       // Create inbox entry using Notion Write Service
       const result = await notionWriteService.createInboxEntry({
@@ -303,7 +309,8 @@ class OrchestratorService {
     userId: string,
     sessionId: string,
     servicesUsed: string[],
-    startTime: number
+    startTime: number,
+    apiKey?: string
   ): Promise<OrchestratorResponse> {
     logger.info('[Orchestrator] Handling TASK_EXECUTION', { userId, sessionId });
     servicesUsed.push('execution', 'task', 'gemini');
@@ -312,7 +319,7 @@ class OrchestratorService {
       const result = await executionService.executeNextTask({
         sessionId,
         userId
-      });
+      }, apiKey);
 
       // Format output
       const output = `Let's work on the next task!
@@ -484,7 +491,8 @@ Ready to continue? Just say "start working" or "next task"!`;
     userId: string,
     sessionId: string,
     servicesUsed: string[],
-    startTime: number
+    startTime: number,
+    apiKey?: string
   ): Promise<OrchestratorResponse> {
     logger.info('[Orchestrator] Handling TASK_DECOMPOSITION', { userId, sessionId });
     servicesUsed.push('task', 'gemini');
@@ -494,7 +502,7 @@ Ready to continue? Just say "start working" or "next task"!`;
         input,
         sessionId,
         userId
-      });
+      }, apiKey);
 
       // Format output
       const output = `I've broken down your goal into actionable tasks:
@@ -556,13 +564,14 @@ All tasks have been saved and are ready to track. You can start working on them 
     userId: string,
     sessionId: string | undefined,
     servicesUsed: string[],
-    startTime: number
+    startTime: number,
+    apiKey?: string
   ): Promise<OrchestratorResponse> {
     logger.info('[Orchestrator] Handling RESUME request', { userId, sessionId });
     servicesUsed.push('resume', 'session', 'gemini');
 
     try {
-      const resumeResult = await resumeService.resumeWork(userId, sessionId);
+      const resumeResult = await resumeService.resumeWork(userId, sessionId, apiKey);
 
       // Format output
       const output = `${resumeResult.summary}
@@ -623,7 +632,8 @@ ${resumeResult.nextSteps.map((step, i) => `${i + 1}. ${step}`).join('\n')}
   private async handleQueryIntent(
     intent: QueryIntent, 
     userId: string, 
-    servicesUsed: string[]
+    servicesUsed: string[],
+    apiKey?: string
   ): Promise<OrchestratorResponse> {
     logger.info('[Orchestrator] Handling QUERY intent', { userId, question: intent.question });
     servicesUsed.push('context-retrieval', 'gemini');
@@ -647,7 +657,7 @@ ${resumeResult.nextSteps.map((step, i) => `${i + 1}. ${step}`).join('\n')}
       const contextText = contextRetrievalService.getDetailedContext(retrievalResult.topMatches);
 
       // Step 3: Analyze with Gemini
-      const analysis = await geminiService.analyzeWithContext(intent.question, contextText);
+      const analysis = await geminiService.analyzeWithContext(intent.question, contextText, apiKey);
 
       // Step 4: Prepare references from top matches
       const references = retrievalResult.topMatches.map(match => match.url);
@@ -693,7 +703,8 @@ ${resumeResult.nextSteps.map((step, i) => `${i + 1}. ${step}`).join('\n')}
   private async handleGenerateDocIntent(
     intent: GenerateDocIntent, 
     userId: string, 
-    servicesUsed: string[]
+    servicesUsed: string[],
+    apiKey?: string
   ): Promise<OrchestratorResponse> {
     logger.info('[Orchestrator] Handling GENERATE_DOC intent', { userId, topic: intent.topic });
     servicesUsed.push('gemini', 'notion');
@@ -718,7 +729,7 @@ ${resumeResult.nextSteps.map((step, i) => `${i + 1}. ${step}`).join('\n')}
       }
 
       // Step 2: Generate document with Gemini
-      const document = await geminiService.generateDocument(intent.topic, contextText);
+      const document = await geminiService.generateDocument(intent.topic, contextText, apiKey);
 
       // Step 3: Create inbox entry using Notion Write Service
       const result = await notionWriteService.createInboxEntry({
@@ -761,7 +772,8 @@ ${resumeResult.nextSteps.map((step, i) => `${i + 1}. ${step}`).join('\n')}
   private async handleOperateIntent(
     intent: OperateIntent, 
     userId: string, 
-    servicesUsed: string[]
+    servicesUsed: string[],
+    apiKey?: string
   ): Promise<OrchestratorResponse> {
     logger.info('[Orchestrator] Handling OPERATE intent', { userId, action: intent.action });
     servicesUsed.push('workflow-engine');
