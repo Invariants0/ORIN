@@ -10,7 +10,7 @@ import {
 } from '@/components/core/ui/dialog';
 import { Pause, Play, XCircle } from 'lucide-react';
 import { WorkflowStatus } from '@/lib/types/workflow.types';
-import { usePauseWorkflow, useResumeWorkflow, useCancelWorkflow } from '@/hooks/queries/useWorkflowQueries';
+import { usePauseWorkflow, useResumeWorkflow, useCancelWorkflow } from '@/hooks/mutations/useWorkflowMutations';
 import { toast } from 'sonner';
 
 interface WorkflowActionsProps {
