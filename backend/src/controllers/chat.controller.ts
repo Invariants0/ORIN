@@ -36,79 +36,97 @@ export const sendMessage = catchAsync(async (req: Request, res: Response) => {
     messagePreview: message.substring(0, 50)
   });
 
-  // Step 1: Get or create session
-  let currentSessionId = sessionId;
-  let isNewSession = false;
+  try {
+    // Step 1: Get or create session
+    let currentSessionId = sessionId;
+    let isNewSession = false;
 
-  if (!currentSessionId) {
-    // Create new session
-    const title = sessionService.generateSessionTitle(message);
-    const session = await sessionService.createSession({
+    if (!currentSessionId) {
+      // Create new session
+      const title = sessionService.generateSessionTitle(message);
+      const session = await sessionService.createSession({
+        userId,
+        title
+      });
+      currentSessionId = session.id;
+      isNewSession = true;
+
+      logger.info('[Chat Controller] New session created', { 
+        sessionId: currentSessionId,
+        userId 
+      });
+    } else {
+      // Verify session exists and belongs to user
+      const session = await sessionService.getSession(currentSessionId);
+      if (!session) {
+        throw APIError.notFound('Session not found');
+      }
+      if (session.userId !== userId) {
+        throw APIError.forbidden('Access denied to this session');
+      }
+    }
+
+    // Step 2: Store user message
+    await sessionService.addMessage({
+      sessionId: currentSessionId,
+      role: 'user',
+      content: message.trim()
+    });
+
+    // Step 3: Process through orchestrator (single entry point)
+    const result = await orchestratorService.handleUserInput(
+      message.trim(), 
       userId,
-      title
-    });
-    currentSessionId = session.id;
-    isNewSession = true;
+      currentSessionId
+    );
 
-    logger.info('[Chat Controller] New session created', { 
+    // Step 4: Store assistant response
+    await sessionService.addMessage({
       sessionId: currentSessionId,
-      userId 
+      role: 'assistant',
+      content: result.output,
+      intent: result.intent,
+      metadata: {
+        confidence: result.metadata.confidence,
+        processingTimeMs: result.metadata.processingTimeMs,
+        servicesUsed: result.metadata.servicesUsed,
+        actions: result.actions
+      }
     });
-  } else {
-    // Verify session exists and belongs to user
-    const session = await sessionService.getSession(currentSessionId);
-    if (!session) {
-      throw APIError.notFound('Session not found');
-    }
-    if (session.userId !== userId) {
-      throw APIError.forbidden('Access denied to this session');
-    }
+
+    logger.info('[Chat Controller] Message processed successfully', {
+      userId,
+      sessionId: currentSessionId,
+      intent: result.intent,
+      processingTimeMs: result.metadata.processingTimeMs
+    });
+
+    // Return standardized response with session info
+    res.status(200).json({
+      success: true,
+      data: {
+        ...result,
+        sessionId: currentSessionId,
+        isNewSession
+      }
+    });
+
+  } catch (error: any) {
+    logger.error('[Chat Controller] Error processing message', {
+      userId,
+      error: error.message,
+      stack: error.stack
+    });
+
+    // Always return a response, never hang
+    res.status(error.statusCode || 500).json({
+      success: false,
+      error: {
+        message: error.message || 'An error occurred processing your message',
+        code: error.statusCode || 500
+      }
+    });
   }
-
-  // Step 2: Store user message
-  await sessionService.addMessage({
-    sessionId: currentSessionId,
-    role: 'user',
-    content: message.trim()
-  });
-
-  // Step 3: Process through orchestrator (single entry point)
-  const result = await orchestratorService.handleUserInput(
-    message.trim(), 
-    userId,
-    currentSessionId
-  );
-
-  // Step 4: Store assistant response
-  await sessionService.addMessage({
-    sessionId: currentSessionId,
-    role: 'assistant',
-    content: result.output,
-    intent: result.intent,
-    metadata: {
-      confidence: result.metadata.confidence,
-      processingTimeMs: result.metadata.processingTimeMs,
-      servicesUsed: result.metadata.servicesUsed,
-      actions: result.actions
-    }
-  });
-
-  logger.info('[Chat Controller] Message processed successfully', {
-    userId,
-    sessionId: currentSessionId,
-    intent: result.intent,
-    processingTimeMs: result.metadata.processingTimeMs
-  });
-
-  // Return standardized response with session info
-  res.status(200).json({
-    success: true,
-    data: {
-      ...result,
-      sessionId: currentSessionId,
-      isNewSession
-    }
-  });
 });
 
 /**
