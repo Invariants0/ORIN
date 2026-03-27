@@ -63,7 +63,7 @@ export default function WorkflowsPage() {
   const { alerts, removeAlert, acknowledgeAlert, clearAlerts } = useAlertsStore();
   // Autonomy — real data from backend + optimistic mutations
   const { level, setLevel } = useAutonomyStore();
-  const { data: actions = [], isLoading: actionsLoading } = useAutonomyActions();
+  const { data: actions = [] } = useAutonomyActions();
   const { mutate: executeAction } = useExecuteAutonomyAction();
   useWebSocketContext();
 
@@ -298,7 +298,7 @@ export default function WorkflowsPage() {
                     actions={actions}
                     onApprove={(id) => executeAction({ actionId: id, decision: 'approve', approvalData: { approvedBy: 'user' } })}
                     onReject={(id) => executeAction({ actionId: id, decision: 'reject' })}
-                    onUndo={(_id) => { /* Phase 5 — undo not yet supported by backend */ }}
+                    onUndo={() => { /* Phase 5 — undo not yet supported by backend */ }}
                   />
                   </div>
                   

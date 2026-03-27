@@ -29,6 +29,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { authClient } from '@/lib/auth';
 import { API_BASE_URL } from '@/lib/constants';
+import Image from 'next/image';
 
 type SettingsTab = 'profile' | 'connections' | 'api' | 'notifications' | 'appearance' | 'privacy';
 
@@ -67,7 +68,7 @@ export default function SettingsPage() {
     setIsSaving(true);
     try {
       if (activeTab === 'profile') {
-        const { data, error } = await authClient.updateUser({
+        const { error } = await authClient.updateUser({
           name: name,
         });
         
@@ -222,7 +223,13 @@ export default function SettingsPage() {
                       <div className="flex items-center gap-6">
                         <div className="w-24 h-24 rounded-2xl border-4 border-black bg-[#ffe17c] overflow-hidden flex-shrink-0 rotate-2 shadow-[4px_4px_0px_0px_#000]">
                           {user?.image ? (
-                            <img src={user.image} alt={user.name} className="w-full h-full object-cover" />
+                            <Image
+                              src={user.image}
+                              alt={user.name || 'User'}
+                              width={96}
+                              height={96}
+                              className="w-full h-full object-cover"
+                            />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center text-2xl font-black uppercase">
                               {user?.name?.[0] || 'U'}

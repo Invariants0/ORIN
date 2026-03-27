@@ -119,7 +119,7 @@ export default function LandingPage() {
             'PROJECT TRACKING',
             'BRAIN DUMP',
             'SYSTEM DESIGN',
-          ].flatMap((u, i) => [
+          ].flatMap((u) => [
             <span key={u} className="text-3xl font-extrabold text-[#b7c6c2]/50 tracking-tighter uppercase">
               {u}
             </span>,

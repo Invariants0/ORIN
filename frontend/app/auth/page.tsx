@@ -43,7 +43,7 @@ export default function AuthPage() {
     e.preventDefault();
     setIsLoading(true);
     try {
-      const { data, error } = await authClient.signIn.email({
+      const { error } = await authClient.signIn.email({
         email,
         password,
       });
@@ -52,7 +52,7 @@ export default function AuthPage() {
       } else {
         window.location.href = '/onboarding';
       }
-    } catch (err) {
+    } catch {
       alert('An error occurred during login');
     } finally {
       setIsLoading(false);

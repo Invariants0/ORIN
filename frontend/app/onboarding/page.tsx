@@ -55,7 +55,7 @@ export default function OnboardingPage() {
       const { error } = await authClient.updateUser({ geminiKey: apiKey } as any);
       if (error) throw error;
       handleNext();
-    } catch (err) {
+    } catch {
       alert('Failed to save Gemini API key. Please try again.');
     } finally {
       setIsSavingKey(false);
