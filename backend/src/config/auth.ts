@@ -1,6 +1,5 @@
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
-import { dash } from "@better-auth/infra";
 import { oneTap } from "better-auth/plugins";
 import db from "./database.js";
 
@@ -48,7 +47,6 @@ export const auth = betterAuth({
     updateAge: 60 * 60 * 24, // 1 day
   },
   plugins: [
-    dash(),
     oneTap()
   ],
 });
