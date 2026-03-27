@@ -11,6 +11,7 @@ import logger from '../../config/logger.js';
 import envVars from '../../config/envVars.js';
 import db from '../../config/database.js';
 import { IntentType, StoreIntent, QueryIntent, GenerateDocIntent, OperateIntent } from '../../types/intent.types.js';
+import { isNotionPermissionError, getNotionErrorMessage } from '../../utils/notion-errors.js';
 
 export interface OrchestratorResponse {
   intent: string;
@@ -223,29 +224,53 @@ class OrchestratorService {
       // Classify content using Gemini
       const classification = await geminiService.classifyContent(intent.content, apiKey);
 
-      // Create inbox entry using Notion Write Service
-      const result = await notionWriteService.createInboxEntry({
-        title: intent.suggestedTitle || classification.title,
-        type: classification.type,
-        tags: intent.tags || classification.tags,
-        content: classification.content,
-        source: intent.category,
-        userId
-      });
+      // Try to create inbox entry using Notion Write Service
+      try {
+        const result = await notionWriteService.createInboxEntry({
+          title: intent.suggestedTitle || classification.title,
+          type: classification.type,
+          tags: intent.tags || classification.tags,
+          content: classification.content,
+          source: intent.category,
+          userId
+        });
 
-      // Handle duplicate case
-      if (result.duplicate) {
+        // Handle duplicate case
+        if (result.duplicate) {
+          return {
+            intent: IntentType.STORE,
+            output: `This content appears to be a duplicate of an existing entry. Skipped creation to avoid redundancy.`,
+            references: [result.url],
+            actions: [{
+              type: 'notion_duplicate_detected',
+              status: 'skipped',
+              details: {
+                pageId: result.pageId,
+                title: intent.suggestedTitle || classification.title,
+                mergedWith: result.mergedWith
+              }
+            }],
+            metadata: {
+              processingTimeMs: 0,
+              confidence: 0,
+              servicesUsed: []
+            }
+          };
+        }
+
         return {
           intent: IntentType.STORE,
-          output: `This content appears to be a duplicate of an existing entry. Skipped creation to avoid redundancy.`,
+          output: `Successfully stored: "${intent.suggestedTitle || classification.title}". Your content has been saved to Notion.`,
           references: [result.url],
           actions: [{
-            type: 'notion_duplicate_detected',
-            status: 'skipped',
+            type: 'notion_create',
+            status: 'completed',
             details: {
               pageId: result.pageId,
-              title: intent.suggestedTitle || classification.title,
-              mergedWith: result.mergedWith
+              title: classification.title,
+              type: classification.type,
+              tags: intent.tags || classification.tags,
+              created: result.created
             }
           }],
           metadata: {
@@ -254,29 +279,68 @@ class OrchestratorService {
             servicesUsed: []
           }
         };
-      }
 
-      return {
-        intent: IntentType.STORE,
-        output: `Successfully stored: "${intent.suggestedTitle || classification.title}". Your content has been saved to Notion.`,
-        references: [result.url],
-        actions: [{
-          type: 'notion_create',
-          status: 'completed',
-          details: {
-            pageId: result.pageId,
-            title: classification.title,
-            type: classification.type,
-            tags: intent.tags || classification.tags,
-            created: result.created
-          }
-        }],
-        metadata: {
-          processingTimeMs: 0,
-          confidence: 0,
-          servicesUsed: []
+      } catch (notionError: any) {
+        // Check if this is a permission error
+        if (isNotionPermissionError(notionError)) {
+          logger.warn('[Orchestrator] Notion permission error, falling back to local storage', {
+            error: notionError.message
+          });
+
+          // Fallback: Store in local database
+          await db.message.create({
+            data: {
+              chatSessionId: userId, // Using userId as fallback session
+              role: 'system',
+              content: JSON.stringify({
+                title: intent.suggestedTitle || classification.title,
+                type: classification.type,
+                tags: intent.tags || classification.tags,
+                content: classification.content,
+                source: intent.category,
+                storedAt: new Date().toISOString(),
+                fallbackReason: 'notion_permission_error'
+              }),
+              intent: IntentType.STORE,
+              metadata: {
+                fallback: true,
+                originalError: 'Notion access denied'
+              }
+            }
+          });
+
+          return {
+            intent: IntentType.STORE,
+            output: `Content saved locally: "${intent.suggestedTitle || classification.title}". 
+
+⚠️ Notion integration is not connected. To save directly to Notion:
+1. Open your Notion workspace
+2. Share a page or database with the ORIN integration
+3. Try storing content again
+
+Your content is safely stored in the local database for now.`,
+            references: [],
+            actions: [{
+              type: 'local_storage_fallback',
+              status: 'completed',
+              details: {
+                title: classification.title,
+                type: classification.type,
+                tags: intent.tags || classification.tags,
+                reason: getNotionErrorMessage(notionError)
+              }
+            }],
+            metadata: {
+              processingTimeMs: 0,
+              confidence: 0,
+              servicesUsed: ['local-db']
+            }
+          };
         }
-      };
+
+        // For other errors, throw them
+        throw notionError;
+      }
 
     } catch (error: any) {
       logger.error('[Orchestrator] STORE intent failed', { error: error.message });
