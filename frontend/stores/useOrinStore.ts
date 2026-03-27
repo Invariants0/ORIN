@@ -97,6 +97,7 @@ export const useOrinStore = create<OrinState & OrinActions>((set, get) => ({
     set((s) => {
       const tempMessages = s.sessionMessages[tempId] ?? [];
       const { [tempId]: _removed, ...restMessages } = s.sessionMessages;
+      void _removed;
       return {
         currentSessionId: realId,
         sessionMessages: {
@@ -109,6 +110,7 @@ export const useOrinStore = create<OrinState & OrinActions>((set, get) => ({
     set((s) => {
       const nextSessions = s.sessions.filter((session) => session.id !== id);
       const { [id]: _removed, ...restMessages } = s.sessionMessages;
+      void _removed;
       const isCurrent = s.currentSessionId === id;
       return {
         sessions: nextSessions,
