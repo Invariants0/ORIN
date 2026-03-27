@@ -1,7 +1,7 @@
 "use client";
 
 import { Brain, PenTool } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/core/ui/button";
 import { cn } from "@/lib/utils";
 
 interface ModeToggleProps {
