@@ -20,9 +20,11 @@ export const sendMessage = catchAsync(async (req: Request, res: Response) => {
     throw APIError.badRequest("Message exceeds maximum length of 10000 characters");
   }
 
-  // Extract userId from auth (placeholder for now - will be replaced with real auth)
-  // For demo purposes, ensure anonymous user exists
-  const userId = (req as any).user?.id || 'anonymous';
+  // Ensure user is authenticated via middleware
+  const userId = (req as any).user?.id;
+  if (!userId) {
+    throw APIError.unauthorized("Authentication required to send message");
+  }
   
   // Ensure user exists in database
   await sessionService.ensureUserExists(userId);
@@ -113,8 +115,9 @@ export const sendMessage = catchAsync(async (req: Request, res: Response) => {
  * Get session history
  */
 export const getSession = catchAsync(async (req: Request, res: Response) => {
-  const { sessionId } = req.params;
-  const userId = (req as any).user?.id || 'anonymous';
+  const sessionId = req.params.sessionId as string;
+  const userId = (req as any).user?.id;
+  if (!userId) throw APIError.unauthorized("Authentication required");
 
   logger.info('[Chat Controller] Fetching session', { sessionId, userId });
 
@@ -138,7 +141,8 @@ export const getSession = catchAsync(async (req: Request, res: Response) => {
  * Get user's sessions
  */
 export const getUserSessions = catchAsync(async (req: Request, res: Response) => {
-  const userId = (req as any).user?.id || 'anonymous';
+  const userId = (req as any).user?.id;
+  if (!userId) throw APIError.unauthorized("Authentication required");
   const limit = parseInt(req.query.limit as string) || 20;
 
   logger.info('[Chat Controller] Fetching user sessions', { userId, limit });
@@ -158,8 +162,9 @@ export const getUserSessions = catchAsync(async (req: Request, res: Response) =>
  * Delete a session
  */
 export const deleteSession = catchAsync(async (req: Request, res: Response) => {
-  const { sessionId } = req.params;
-  const userId = (req as any).user?.id || 'anonymous';
+  const sessionId = req.params.sessionId as string;
+  const userId = (req as any).user?.id;
+  if (!userId) throw APIError.unauthorized("Authentication required");
 
   logger.info('[Chat Controller] Deleting session', { sessionId, userId });
 

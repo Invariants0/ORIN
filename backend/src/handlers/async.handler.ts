@@ -1,9 +1,9 @@
 import type { Request, Response, NextFunction } from "express";
 
-type AsyncController = (req: Request, res: Response, next: NextFunction) => Promise<void>;
+type AsyncController = (req: Request, res: Response, next: NextFunction) => Promise<any>;
 
 const catchAsync = <P, ResBody, ReqBody, ReqQuery>(
-  fn: (req: Request<P, ResBody, ReqBody, ReqQuery>, res: Response, next: NextFunction) => Promise<void>
+  fn: (req: Request<P, ResBody, ReqBody, ReqQuery>, res: Response, next: NextFunction) => Promise<any>
 ) => {
   return (req: Request<P, ResBody, ReqBody, ReqQuery>, res: Response, next: NextFunction) => {
     Promise.resolve(fn(req, res, next)).catch(next);
