@@ -17,8 +17,9 @@ import {
 import { cn } from '@/lib/utils';
 
 export const Topbar = () => {
-  const { mode, setMode, connections, setIsAccountOpen } = useOrinStore();
+  const { mode, setMode, connections, setIsAccountOpen, user: storeUser } = useOrinStore();
   const { user } = useAuth();
+  const notionConnected = Boolean((storeUser as any)?.notionToken || (user as any)?.notionToken);
 
   return (
     <header className="h-14 bg-white border-b-2 border-black flex items-center justify-between px-5 sticky top-0 z-30 flex-shrink-0">
@@ -61,18 +62,20 @@ export const Topbar = () => {
             { key: 'notion' as const, icon: Database, label: 'Notion' },
             { key: 'email'  as const, icon: Mail,     label: 'Email' },
             { key: 'slack'  as const, icon: Slack,    label: 'Slack' },
-          ].map(({ key, icon: Icon, label }) => (
+          ].map(({ key, icon: Icon, label }) => {
+            const isConnected = key === 'notion' ? notionConnected : connections[key];
+            return (
             <div
               key={key}
-              title={`${label}: ${connections[key] ? 'connected' : 'disconnected'}`}
+              title={`${label}: ${isConnected ? 'connected' : 'disconnected'}`}
               className={cn(
                 'w-6 h-6 rounded border-2 border-black flex items-center justify-center transition-all',
-                connections[key] ? 'bg-[#b7c6c2]' : 'bg-neutral-100 opacity-25'
+                isConnected ? 'bg-[#b7c6c2]' : 'bg-neutral-100 opacity-25'
               )}
             >
               <Icon className="w-3 h-3" />
             </div>
-          ))}
+          )})}
         </div>
 
         <div className="h-5 w-px bg-black/10" />

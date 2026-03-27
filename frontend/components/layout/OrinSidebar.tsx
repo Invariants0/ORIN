@@ -70,12 +70,16 @@ export const OrinSidebar = () => {
       <UserAccountDialog isOpen={isAccountOpen} onOpenChange={setIsAccountOpen} />
 
       {/* Header — exact same height as Topbar (h-14) */}
-      <div className="h-14 border-b-2 border-black flex items-center px-5 gap-2.5 flex-shrink-0 bg-[#171e19]">
+      <button
+        type="button"
+        onClick={() => router.push('/')}
+        className="h-14 border-b-2 border-black flex items-center px-5 gap-2.5 flex-shrink-0 bg-[#171e19] hover:bg-[#141a17] transition-colors"
+      >
         <div className="w-7 h-7 bg-[#ffe17c] flex items-center justify-center border-2 border-black flex-shrink-0 shadow-[2px_2px_0px_0px_#000]">
           <div className="w-2.5 h-2.5 bg-black rotate-45" />
         </div>
         <span className="text-lg font-extrabold tracking-tighter uppercase">ORIN</span>
-      </div>
+      </button>
 
       {/* New Session Button */}
       <div className="px-4 py-3">
