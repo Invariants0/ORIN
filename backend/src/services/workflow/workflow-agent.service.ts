@@ -1,8 +1,6 @@
 import logger from '@/config/logger.js';
 import { geminiService } from '@/services/ai/gemini.service.js';
 import { agentService } from '@/services/orchestration/agent.service.js';
-import { taskService } from '@/services/workflow/task.service.js';
-import { executionService } from '@/services/workflow/execution.service.js';
 import { workflowRepository } from '@/services/workflow/workflow.repository.js';
 
 interface WorkflowStep {

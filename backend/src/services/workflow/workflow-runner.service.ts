@@ -1,7 +1,6 @@
 import logger from '@/config/logger.js';
 import { workflowRepository } from '@/services/workflow/workflow.repository.js';
 import { geminiService } from '@/services/ai/gemini.service.js';
-import { agentService } from '@/services/orchestration/agent.service.js';
 import { monitoringService } from '@/services/infrastructure/monitoring.service.js';
 import crypto from 'crypto';
 
