@@ -81,6 +81,29 @@ class IntentDetectionService {
         ...(data.extractedData || {})
       };
 
+      // Coerce QUERY fields when model returns string instead of array
+      if (normalized.type === IntentType.QUERY) {
+        if (!normalized.question && typeof (normalized as any).query === 'string') {
+          (normalized as any).question = (normalized as any).query;
+        }
+
+        const terms = (normalized as any).searchTerms;
+        if (typeof terms === 'string') {
+          (normalized as any).searchTerms = terms
+            .split(/[,\s]+/g)
+            .map((t) => t.trim())
+            .filter((t) => t.length > 0);
+        }
+
+        if (!Array.isArray((normalized as any).searchTerms) && normalized.question) {
+          (normalized as any).searchTerms = String(normalized.question)
+            .toLowerCase()
+            .split(/\s+/g)
+            .map((t) => t.replace(/[^\w-]/g, ''))
+            .filter((t) => t.length > 2);
+        }
+      }
+
       this.validateIntentStructure(normalized);
 
       return normalized as Intent;
