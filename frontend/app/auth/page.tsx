@@ -6,8 +6,42 @@ import { Button } from '@/components/core/brand/Button';
 import { BrandInput } from '@/components/core/brand/Input';
 import { Github, Chrome } from 'lucide-react';
 import Link from 'next/link';
+import { useAuth } from '@/hooks/useAuth';
+import { useState } from 'react';
+import { authClient } from '@/lib/auth';
 
 export default function AuthPage() {
+  const { loginWithGoogle, loginWithGithub, googleOneTap, isAuthenticated, loading } = useAuth();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  React.useEffect(() => {
+    if (!isAuthenticated && !loading) {
+      googleOneTap();
+    }
+  }, [isAuthenticated, loading, googleOneTap]);
+
+  const handleEmailLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    try {
+      const { data, error } = await authClient.signIn.email({
+        email,
+        password,
+      });
+      if (error) {
+        alert(error.message || 'Login failed');
+      } else {
+        window.location.href = '/onboarding';
+      }
+    } catch (err) {
+      alert('An error occurred during login');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#ffe17c] flex items-center justify-center p-8 relative overflow-hidden">
       {/* Dot Pattern Background */}
@@ -29,11 +63,11 @@ export default function AuthPage() {
         </div>
 
         <div className="space-y-4">
-          <Button variant="outline" className="w-full flex items-center justify-center gap-3 py-4">
+          <Button variant="outline" className="w-full flex items-center justify-center gap-3 py-4" onClick={loginWithGoogle}>
             <Chrome className="w-5 h-5" />
             Continue with Google
           </Button>
-          <Button variant="outline" className="w-full flex items-center justify-center gap-3 py-4">
+          <Button variant="outline" className="w-full flex items-center justify-center gap-3 py-4" onClick={loginWithGithub}>
             <Github className="w-5 h-5" />
             Continue with Github
           </Button>
@@ -50,21 +84,18 @@ export default function AuthPage() {
 
         <form
           className="space-y-6"
-          onSubmit={(e) => {
-            e.preventDefault();
-            window.location.href = '/onboarding';
-          }}
+          onSubmit={handleEmailLogin}
         >
           <div className="space-y-2">
             <label className="text-xs font-black uppercase tracking-widest">Email Address</label>
-            <BrandInput type="email" placeholder="name@company.com" required />
+            <BrandInput type="email" placeholder="name@company.com" required value={email} onChange={(e) => setEmail(e.target.value)} />
           </div>
           <div className="space-y-2">
             <label className="text-xs font-black uppercase tracking-widest">Password</label>
-            <BrandInput type="password" placeholder="••••••••" required />
+            <BrandInput type="password" placeholder="••••••••" required value={password} onChange={(e) => setPassword(e.target.value)} />
           </div>
-          <Button type="submit" className="w-full py-4 text-lg">
-            Sign In
+          <Button type="submit" disabled={isLoading} className="w-full py-4 text-lg">
+            {isLoading ? 'Signing In...' : 'Sign In'}
           </Button>
         </form>
 
