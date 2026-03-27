@@ -6,6 +6,8 @@ import { Send, FileText, Search, Pickaxe, Play, Command, Zap, Loader2 } from 'lu
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChatApi } from '@/lib/api/endpoints/chat.api';
+import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/hooks/queries/query-keys';
 
 // ── Static command metadata (UI only) ────────────────────────────────
 
@@ -27,13 +29,14 @@ interface OrinChatInputProps {
 // ── Component ─────────────────────────────────────────────────────────
 
 export const OrinChatInput = ({ prefillRef }: OrinChatInputProps) => {
+  const queryClient = useQueryClient();
   const [input, setInput] = useState('');
   const [showSlash, setShowSlash] = useState(false);
   const [slashQuery, setSlashQuery] = useState('');
   const [highlighted, setHighlighted] = useState(0);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const { mode, addMessage, updateMessage, setLoading, loadingStates, currentSessionId, setSession } = useOrinStore();
+  const { mode, addMessage, updateMessage, setLoading, loadingStates, currentSessionId, setSession, promoteSession } = useOrinStore();
 
   // ── Prefill handle (suggestion clicks) ────────────────────────────
   useImperativeHandle(prefillRef as any, () => (text: string) => {
@@ -88,7 +91,8 @@ export const OrinChatInput = ({ prefillRef }: OrinChatInputProps) => {
     try {
       // 3. Call ChatApi orchestrator
       // Only pass sessionId if it's not a temporary client-side ID
-      const validSessionId = currentSessionId?.startsWith('session-') ? undefined : currentSessionId;
+    const tempSessionId = currentSessionId;
+    const validSessionId = tempSessionId?.startsWith('session-') ? undefined : tempSessionId;
       
       const response = await ChatApi.sendMessage({
         message: trimmed,
@@ -96,7 +100,10 @@ export const OrinChatInput = ({ prefillRef }: OrinChatInputProps) => {
       });
 
       // Update Session ID if it's new
-      if (response.isNewSession) {
+      if (response.isNewSession && tempSessionId) {
+        promoteSession(tempSessionId, response.sessionId);
+        queryClient.invalidateQueries({ queryKey: queryKeys.chat.sessions() });
+      } else if (response.sessionId) {
         setSession(response.sessionId);
       }
 

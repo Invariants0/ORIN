@@ -10,27 +10,50 @@ import {
   MessageSquare,
   History,
   Settings,
-  LogOut,
   ChevronRight,
   Zap,
+  Trash2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 import { UserAccountDialog } from './UserAccountDialog';
 import { useAuth } from '@/hooks/useAuth';
+import { useChatSessions } from '@/hooks/queries/useChatSessions';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { ChatApi } from '@/lib/api/endpoints/chat.api';
+import { queryKeys } from '@/hooks/queries/query-keys';
+import { toast } from 'sonner';
 
 export const OrinSidebar = () => {
+  useChatSessions();
   const { 
     sessions, 
     currentSessionId, 
     setCurrentSessionId, 
     newSession,
+    removeSession,
     isAccountOpen,
     setIsAccountOpen 
   } = useOrinStore();
   const { user } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const queryClient = useQueryClient();
+
+  const deleteMutation = useMutation({
+    mutationFn: (sessionId: string) => ChatApi.deleteSession(sessionId),
+    onSuccess: (_data, sessionId) => {
+      removeSession(sessionId);
+      queryClient.invalidateQueries({ queryKey: queryKeys.chat.sessions() });
+      if (sessionId === currentSessionId) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.chat.session(sessionId) });
+      }
+      toast.success('Session deleted');
+    },
+    onError: (error: any) => {
+      toast.error(`Failed to delete session: ${error?.message ?? 'Unknown error'}`);
+    }
+  });
 
   const openSession = (id: string) => {
     setCurrentSessionId(id);
@@ -100,6 +123,19 @@ export const OrinSidebar = () => {
                   )}
                 />
                 <span className="text-xs font-bold truncate flex-1">{session.title}</span>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    if (!deleteMutation.isPending) {
+                      deleteMutation.mutate(session.id);
+                    }
+                  }}
+                  className="opacity-0 group-hover:opacity-60 hover:opacity-100 transition-all text-red-500 hover:text-red-400"
+                  aria-label="Delete session"
+                >
+                  <Trash2 className="w-3 h-3" />
+                </button>
                 <ChevronRight
                   className={cn(
                     'w-3 h-3 flex-shrink-0 transition-all',

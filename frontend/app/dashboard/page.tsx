@@ -6,16 +6,24 @@ import { Topbar } from '@/components/layout/Topbar';
 import { OrinChatWindow } from '@/components/features/chat/ChatWindow';
 import { OrinChatInput } from '@/components/features/chat/OrinChatInput';
 import { useOrinStore } from '@/stores/useOrinStore';
+import { useChatSessionMessages, useChatSessions } from '@/hooks/queries/useChatSessions';
 export default function DashboardPage() {
-  const { currentSessionId, newSession } = useOrinStore();
+  const { currentSessionId, newSession, sessions, setCurrentSessionId } = useOrinStore();
   const inputPrefillRef = useRef<((text: string) => void) | null>(null);
 
-  // Auto-create a new session if none is selected
+  useChatSessions();
+  useChatSessionMessages(currentSessionId);
+
+  // Auto-select most recent session or create a draft one
   useEffect(() => {
     if (!currentSessionId) {
-      newSession();
+      if (sessions.length > 0) {
+        setCurrentSessionId(sessions[0].id);
+      } else {
+        newSession();
+      }
     }
-  }, [currentSessionId, newSession]);
+  }, [currentSessionId, newSession, sessions, setCurrentSessionId]);
 
   const handleSuggestionClick = useCallback((text: string) => {
     inputPrefillRef.current?.(text);
