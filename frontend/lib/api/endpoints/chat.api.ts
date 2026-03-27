@@ -52,5 +52,11 @@ export const ChatApi = {
    * Fetch list of user sessions
    */
   getSessions: () =>
-    client.get(`/sessions`).then(res => res.data.data || res.data)
+    client.get(`/sessions`).then(res => res.data.data || res.data),
+
+  /**
+   * Delete a session
+   */
+  deleteSession: (sessionId: string) =>
+    client.delete(`/sessions/${sessionId}`).then(res => res.data.data || res.data),
 };

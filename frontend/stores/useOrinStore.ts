@@ -59,6 +59,9 @@ interface OrinActions {
   setMode: (m: Mode) => void;
   setCurrentSessionId: (id: string | null) => void;
   setSessions: (sessions: OrinSession[]) => void;
+  setSessionMessages: (id: string, messages: OrinMessage[]) => void;
+  promoteSession: (tempId: string, realId: string) => void;
+  removeSession: (id: string) => void;
   getMessages: () => OrinMessage[];
   addMessage: (msg: OrinMessage) => void;
   updateMessage: (id: string, patch: Partial<OrinMessage>) => void;
@@ -86,6 +89,33 @@ export const useOrinStore = create<OrinState & OrinActions>((set, get) => ({
   setCurrentSessionId: (id) => set({ currentSessionId: id }),
   setSession: (id) => set({ currentSessionId: id }),
   setSessions: (sessions) => set({ sessions }),
+  setSessionMessages: (id, messages) =>
+    set((s) => ({
+      sessionMessages: { ...s.sessionMessages, [id]: messages },
+    })),
+  promoteSession: (tempId, realId) =>
+    set((s) => {
+      const tempMessages = s.sessionMessages[tempId] ?? [];
+      const { [tempId]: _removed, ...restMessages } = s.sessionMessages;
+      return {
+        currentSessionId: realId,
+        sessionMessages: {
+          ...restMessages,
+          [realId]: [...tempMessages],
+        },
+      };
+    }),
+  removeSession: (id) =>
+    set((s) => {
+      const nextSessions = s.sessions.filter((session) => session.id !== id);
+      const { [id]: _removed, ...restMessages } = s.sessionMessages;
+      const isCurrent = s.currentSessionId === id;
+      return {
+        sessions: nextSessions,
+        sessionMessages: restMessages,
+        currentSessionId: isCurrent ? (nextSessions[0]?.id ?? null) : s.currentSessionId,
+      };
+    }),
 
   getMessages: () => {
     const { currentSessionId, sessionMessages } = get();
@@ -127,7 +157,6 @@ export const useOrinStore = create<OrinState & OrinActions>((set, get) => ({
   newSession: () => {
     const id = `session-${Date.now()}`;
     set((s) => ({
-      sessions: [{ id, title: 'New Session', createdAt: Date.now() }, ...s.sessions],
       currentSessionId: id,
       sessionMessages: { ...s.sessionMessages, [id]: [] },
     }));
