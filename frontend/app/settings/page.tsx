@@ -25,6 +25,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useAuth } from '@/hooks/useAuth';
+import { authClient } from '@/lib/auth';
 
 type SettingsTab = 'profile' | 'connections' | 'api' | 'notifications' | 'appearance' | 'privacy';
 
@@ -38,15 +40,47 @@ const TABS: { id: SettingsTab; label: string; icon: React.ElementType }[] = [
 ];
 
 export default function SettingsPage() {
-  const { connections, updateConnection, user } = useOrinStore();
+  const { connections, updateConnection, user: storeUser, setUser: setStoreUser } = useOrinStore();
+  const { user } = useAuth();
+  
   const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
   const [saved, setSaved] = useState(false);
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
   const [geminiKey, setGeminiKey] = useState('');
   const [notionKey, setNotionKey] = useState('');
 
-  const handleSave = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  // Update local state when user session loads
+  React.useEffect(() => {
+    if (user) {
+      setName(user.name);
+      setEmail(user.email);
+    }
+  }, [user]);
+
+  const handleSave = async () => {
+    try {
+      if (activeTab === 'profile') {
+        const { data, error } = await authClient.updateUser({
+          name: name,
+        });
+        
+        if (error) throw error;
+
+        // Update the global store manually for immediate feedback
+        if (storeUser) {
+          setStoreUser({
+            ...storeUser,
+            name: name
+          });
+        }
+      }
+      
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (err) {
+      console.error("Failed to save settings", err);
+    }
   };
 
   return (
@@ -142,25 +176,31 @@ export default function SettingsPage() {
                       <p className="font-bold text-black/50 mt-1">Manage your personal information.</p>
                     </div>
 
-                    <Card variant="white" className="space-y-8 p-8">
+                    <Card variant="white" className="space-y-8 p-8 shadow-[8px_8px_0px_0px_#000]">
                       <div className="flex items-center gap-6">
-                        <div className="w-20 h-20 rounded-full border-2 border-black bg-[#ffe17c] overflow-hidden flex-shrink-0">
-                          <img src="https://picsum.photos/seed/user1/100/100" alt="Avatar" className="w-full h-full object-cover" />
+                        <div className="w-24 h-24 rounded-2xl border-4 border-black bg-[#ffe17c] overflow-hidden flex-shrink-0 rotate-2 shadow-[4px_4px_0px_0px_#000]">
+                          {user?.image ? (
+                            <img src={user.image} alt={user.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-2xl font-black uppercase">
+                              {user?.name?.[0] || 'U'}
+                            </div>
+                          )}
                         </div>
                         <div className="space-y-2">
                           <Button variant="outline" size="sm">Change Photo</Button>
-                          <p className="text-xs font-bold text-black/40">JPG, PNG up to 5MB</p>
+                          <p className="text-xs font-black text-black/40 uppercase tracking-widest">JPG, PNG up to 5MB</p>
                         </div>
                       </div>
 
                       <div className="grid grid-cols-2 gap-6">
                         <div className="space-y-2">
                           <label className="text-xs font-black uppercase tracking-widest">Full Name</label>
-                          <BrandInput defaultValue={user?.name || 'Akshad'} />
+                          <BrandInput value={name} onChange={(e) => setName(e.target.value)} />
                         </div>
                         <div className="space-y-2">
-                          <label className="text-xs font-black uppercase tracking-widest">Email</label>
-                          <BrandInput type="email" defaultValue={user?.email || 'akshad@orin.ai'} />
+                          <label className="text-xs font-black uppercase tracking-widest">Email (Read-Only)</label>
+                          <BrandInput type="email" value={email} disabled className="opacity-50 cursor-not-allowed" />
                         </div>
                       </div>
 

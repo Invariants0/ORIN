@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/core/ui/tooltip";
 import { Toaster } from "@/components/core/ui/sonner";
 import { QueryProvider } from "@/providers/query-provider";
 import { WebSocketProvider } from "@/providers/websocket-provider";
+import { AuthProvider } from "@/providers/AuthProvider";
 
 const inter = Inter({subsets:['latin'],variable:'--font-sans'});
 
@@ -36,14 +37,16 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col" suppressHydrationWarning>
-        <QueryProvider>
-          <WebSocketProvider>
-            <TooltipProvider>
-              {children}
-              <Toaster />
-            </TooltipProvider>
-          </WebSocketProvider>
-        </QueryProvider>
+        <AuthProvider>
+          <QueryProvider>
+            <WebSocketProvider>
+              <TooltipProvider>
+                {children}
+                <Toaster />
+              </TooltipProvider>
+            </WebSocketProvider>
+          </QueryProvider>
+        </AuthProvider>
       </body>
     </html>
   );
