@@ -2,6 +2,7 @@ import { Router } from "express";
 import healthRoutes from "@/routes/health.routes.js";
 import authRoutes from "@/routes/auth.routes.js";
 import notionAuthRoutes from "@/routes/notion-auth.routes.js";
+import notionHealthRoutes from "@/routes/notion-health.routes.js";
 import chatRoutes from "@/routes/chat.routes.js";
 import intentRoutes from "@/routes/intent.routes.js";
 import workflowRoutes from "@/routes/workflow.routes.js";
@@ -23,6 +24,7 @@ export const rootRouter = Router();
 rootRouter.use("/health", healthRoutes);
 rootRouter.use("/auth", authRoutes);
 rootRouter.use("/notion/oauth", notionAuthRoutes);
+rootRouter.use("/integrations/notion", notionHealthRoutes);
 rootRouter.use("/v1", v1Router);
 
 export default rootRouter;
