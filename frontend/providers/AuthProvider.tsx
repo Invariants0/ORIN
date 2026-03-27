@@ -63,7 +63,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
     fetchSession();
-  }, [setOrinUser]);
+  }, [setOrinUser, pathname, router]);
 
   const logout = async () => {
     await authClient.signOut();
