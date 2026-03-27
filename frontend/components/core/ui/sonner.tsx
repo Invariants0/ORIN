@@ -11,34 +11,31 @@ const Toaster = ({ ...props }: ToasterProps) => {
     <Sonner
       theme={theme as ToasterProps["theme"]}
       className="toaster group"
+      richColors
       icons={{
         success: (
-          <CircleCheckIcon className="size-4" />
+          <CircleCheckIcon className="size-4 stroke-[3px]" />
         ),
         info: (
-          <InfoIcon className="size-4" />
+          <InfoIcon className="size-4 stroke-[3px]" />
         ),
         warning: (
-          <TriangleAlertIcon className="size-4" />
+          <TriangleAlertIcon className="size-4 stroke-[3px]" />
         ),
         error: (
-          <OctagonXIcon className="size-4" />
+          <OctagonXIcon className="size-4 stroke-[3px]" />
         ),
         loading: (
-          <Loader2Icon className="size-4 animate-spin" />
+          <Loader2Icon className="size-4 animate-spin stroke-[3px]" />
         ),
       }}
-      style={
-        {
-          "--normal-bg": "var(--popover)",
-          "--normal-text": "var(--popover-foreground)",
-          "--normal-border": "var(--border)",
-          "--border-radius": "var(--radius)",
-        } as React.CSSProperties
-      }
       toastOptions={{
         classNames: {
           toast: "cn-toast",
+          title: "font-black uppercase tracking-widest",
+          description: "font-bold text-black/50 lowercase",
+          actionButton: "bg-black text-white font-black uppercase rounded-none border-2 border-black",
+          cancelButton: "bg-white text-black font-black uppercase rounded-none border-2 border-black",
         },
       }}
       {...props}

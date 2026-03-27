@@ -33,6 +33,8 @@ export interface OrinUser {
   email: string;
   name: string;
   avatar?: string;
+  geminiKey?: string;
+  notionToken?: string;
 }
 
 export interface OrinConnections {

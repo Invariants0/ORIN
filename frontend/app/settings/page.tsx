@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { authClient } from '@/lib/auth';
 
@@ -44,7 +45,7 @@ export default function SettingsPage() {
   const { user } = useAuth();
   
   const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
-  const [saved, setSaved] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [geminiKey, setGeminiKey] = useState('');
@@ -55,10 +56,13 @@ export default function SettingsPage() {
     if (user) {
       setName(user.name);
       setEmail(user.email);
+      setGeminiKey((user as any).geminiKey || '');
+      setNotionKey((user as any).notionToken || '');
     }
   }, [user]);
 
   const handleSave = async () => {
+    setIsSaving(true);
     try {
       if (activeTab === 'profile') {
         const { data, error } = await authClient.updateUser({
@@ -74,12 +78,32 @@ export default function SettingsPage() {
             name: name
           });
         }
+      } else if (activeTab === 'api') {
+        const { error } = await authClient.updateUser({
+          geminiKey: geminiKey,
+          notionToken: notionKey,
+        } as any);
+
+        if (error) throw error;
+
+        if (storeUser) {
+          setStoreUser({
+            ...storeUser,
+            geminiKey: geminiKey,
+            notionToken: notionKey,
+          });
+        }
       }
-      
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
+      toast.success(`${activeTab === 'profile' ? 'Profile' : 'API keys'} updated!`, {
+        description: 'Your changes have been saved across the system.',
+      });
     } catch (err) {
       console.error("Failed to save settings", err);
+      toast.error('Failed to save changes', {
+        description: 'Please check your connection and try again.',
+      });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -101,20 +125,7 @@ export default function SettingsPage() {
           </div>
 
           <div className="ml-auto flex items-center gap-4">
-            <AnimatePresence>
-              {saved && (
-                <motion.div
-                  initial={{ opacity: 0, x: 10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 10 }}
-                  className="flex items-center gap-2 text-sm font-black text-green-700 bg-green-50 border-2 border-green-700 px-4 py-2 rounded-lg"
-                >
-                  <Check className="w-4 h-4" />
-                  Saved!
-                </motion.div>
-              )}
-            </AnimatePresence>
-            <Button onClick={handleSave} variant="primary" size="sm">
+            <Button onClick={handleSave} variant="primary" size="sm" isLoading={isSaving}>
               Save Changes
             </Button>
           </div>

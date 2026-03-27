@@ -40,7 +40,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             id: currentUser.id,
             email: currentUser.email,
             name: currentUser.name || "User",
-            avatar: currentUser.image || undefined
+            avatar: currentUser.image || undefined,
+            geminiKey: (currentUser as any).geminiKey,
+            notionToken: (currentUser as any).notionToken
           });
         } else {
           setOrinUser(null);
