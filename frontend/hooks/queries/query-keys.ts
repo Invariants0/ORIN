@@ -43,4 +43,9 @@ export const queryKeys = {
   alerts: {
     all: ['alerts'] as const,
   },
+  chat: {
+    all: ['chat'] as const,
+    sessions: () => [...queryKeys.chat.all, 'sessions'] as const,
+    session: (id: string) => [...queryKeys.chat.all, 'session', id] as const,
+  },
 } as const;
