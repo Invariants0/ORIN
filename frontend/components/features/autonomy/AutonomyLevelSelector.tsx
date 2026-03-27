@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { Card } from '@/components/core/brand/Card';
-import { Button } from '@/components/core/brand/Button';
 import { BrandBadge as Badge } from '@/components/core/brand/Badge';
 import { Shield, Zap, Brain, Hand } from 'lucide-react';
 import { cn } from '@/lib/utils';

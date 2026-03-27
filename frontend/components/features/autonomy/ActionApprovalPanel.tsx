@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { Card } from '@/components/core/brand/Card';
 import { Button } from '@/components/core/brand/Button';
 import { BrandBadge as Badge } from '@/components/core/brand/Badge';
-import { ScrollArea } from '@/components/core/ui/scroll-area';
 import { 
   CheckCircle, 
   XCircle, 
@@ -14,7 +13,6 @@ import {
   ChevronDown,
   ChevronUp
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
 
 interface Action {
   id: string;

@@ -5,7 +5,6 @@ import { ScrollArea } from '@/components/core/ui/scroll-area';
 import { BrandBadge as Badge } from '@/components/core/brand/Badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { Brain, Activity, Shield, TrendingUp, CheckCircle, XCircle } from 'lucide-react';
-import { cn } from '@/lib/utils';
 
 interface Decision {
   id: string;

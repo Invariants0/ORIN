@@ -1,5 +1,5 @@
 import { Card } from '@/components/core/brand/Card';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Workflow } from '@/lib/types/workflow.types';
 
 interface WorkflowStatusChartProps {
