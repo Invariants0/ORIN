@@ -325,7 +325,11 @@ class NotionWriteService {
 
     // Validate content
     if (!input.content || input.content.trim().length === 0) {
-      throw new Error('Content is required and cannot be empty');
+      // Allow empty content - use fallback
+      input.content = 'No content available';
+      logger.warn('[Notion Write] Empty content provided, using fallback', {
+        fallback: input.content
+      });
     }
 
     if (input.content.length > this.MAX_CONTENT_LENGTH) {
