@@ -5,18 +5,21 @@ const EnvConfigSchema = z.object({
   PORT: z.coerce.number().int().positive().default(8000),
   
   // Database (required)
-  DATABASE_URL: z.string().min(1).optional(),
+  DATABASE_URL: z.string().optional(),
   
-  // Auth0 Configuration (optional)
-  AUTH0_DOMAIN: z.string().optional(),
-  AUTH0_CLIENT_ID: z.string().optional(),
-  AUTH0_CLIENT_SECRET: z.string().optional(),
-  AUTH0_AUDIENCE: z.string().optional(),
+  // Better Auth (Required)
+  BETTER_AUTH_SECRET: z.string().optional(),
+  BETTER_AUTH_URL: z.string().optional(),
+  BETTER_AUTH_API_KEY: z.string().optional(),
   
-  // Google OAuth (optional)
+  // Social OAuth (optional)
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
-  GOOGLE_CALLBACK_URL: z.string().url().optional(),
+  GOOGLE_CALLBACK_URL: z.string().optional(),
+  
+  GITHUB_CLIENT_ID: z.string().optional(),
+  GITHUB_CLIENT_SECRET: z.string().optional(),
+  GITHUB_CALLBACK_URL: z.string().optional(),
   
   // AI Services (required for full functionality)
   GEMINI_API_KEY: z.string().optional(),
@@ -46,8 +49,8 @@ try {
   // Check for required variables
   const missingRequired: string[] = [];
   
-  if (!parsed.DATABASE_URL) {
-    missingRequired.push("DATABASE_URL");
+  if (!parsed.BETTER_AUTH_SECRET) {
+    missingRequired.push("BETTER_AUTH_SECRET");
   }
   
   if (!parsed.GEMINI_API_KEY) {
@@ -62,15 +65,11 @@ try {
     missingRequired.push("NOTION_DATABASE_ID");
   }
   
-  // Generate defaults for secrets in development
+  // Final variables mapping
   const finalVars = {
     ...parsed,
-    DATABASE_URL: parsed.DATABASE_URL || "postgresql://localhost:5432/orin",
-    GEMINI_API_KEY: parsed.GEMINI_API_KEY || "dummy-key-for-testing",
-    NOTION_API_KEY: parsed.NOTION_API_KEY || "dummy-key-for-testing",
-    NOTION_DATABASE_ID: parsed.NOTION_DATABASE_ID || "dummy-database-id",
-    SESSION_SECRET: parsed.SESSION_SECRET || `dev-session-secret-${Date.now()}`,
-    JWT_SECRET: parsed.JWT_SECRET || `dev-jwt-secret-${Date.now()}`,
+    DATABASE_URL: parsed.DATABASE_URL || "file:./dev.db",
+    BETTER_AUTH_URL: parsed.BETTER_AUTH_URL || "http://localhost:8000/api/auth",
     isReady: missingRequired.length === 0,
     missingRequired,
   };
