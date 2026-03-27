@@ -28,6 +28,17 @@ const EnvConfigSchema = z.object({
   // Notion Integration (required for full functionality)
   NOTION_API_KEY: z.string().optional(),
   NOTION_DATABASE_ID: z.string().optional(),
+  NOTION_PROVIDER: z.enum(["mcp", "rest"]).optional(),
+  NOTION_MCP_URL: z.string().optional(),
+  NOTION_MCP_TOKEN: z.string().optional(),
+  NOTION_MCP_PARENT_PAGE_ID: z.string().optional(),
+  NOTION_OAUTH_CLIENT_ID: z.string().optional(),
+  NOTION_OAUTH_CLIENT_SECRET: z.string().optional(),
+  NOTION_OAUTH_REDIRECT_URI: z.string().optional(),
+  NOTION_OAUTH_AUTHORIZE_URL: z.string().optional(),
+  NOTION_OAUTH_TOKEN_URL: z.string().optional(),
+  NOTION_OAUTH_SUCCESS_REDIRECT: z.string().optional(),
+  NOTION_VERSION: z.string().optional(),
   
   // Security (use defaults in development)
   SESSION_SECRET: z.string().optional(),
@@ -35,6 +46,9 @@ const EnvConfigSchema = z.object({
   
   // CORS
   FRONTEND_URL: z.string().url().default("http://localhost:3000"),
+
+  // Monitoring
+  MONITORING_ENABLED: z.enum(["true", "false"]).optional(),
 });
 
 type EnvConfig = z.infer<typeof EnvConfigSchema> & {
@@ -58,10 +72,15 @@ try {
     missingRequired.push("GEMINI_API_KEY");
   }
   
-  if (!parsed.NOTION_API_KEY) {
+  const notionProvider = parsed.NOTION_PROVIDER || "mcp";
+  if (notionProvider === "rest" && !parsed.NOTION_API_KEY) {
     missingRequired.push("NOTION_API_KEY");
   }
-  
+
+  if (notionProvider === "mcp" && !parsed.NOTION_MCP_TOKEN) {
+    missingRequired.push("NOTION_MCP_TOKEN");
+  }
+
   if (!parsed.NOTION_DATABASE_ID) {
     missingRequired.push("NOTION_DATABASE_ID");
   }
@@ -72,6 +91,9 @@ try {
     DATABASE_URL: parsed.DATABASE_URL || "file:./dev.db",
     BETTER_AUTH_URL: parsed.BETTER_AUTH_URL || "http://localhost:8000/api/auth",
     GEMINI_MODEL: parsed.GEMINI_MODEL || "gemini-2.5-flash",
+    NOTION_PROVIDER: notionProvider,
+    NOTION_MCP_URL: parsed.NOTION_MCP_URL || "https://mcp.notion.com/mcp",
+    MONITORING_ENABLED: parsed.MONITORING_ENABLED || "true",
     isReady: missingRequired.length === 0,
     missingRequired,
   };
