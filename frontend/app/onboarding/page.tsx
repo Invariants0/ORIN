@@ -1,17 +1,24 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card } from '@/components/core/brand/Card';
 import { Button } from '@/components/core/brand/Button';
 import { BrandInput } from '@/components/core/brand/Input';
 import { BrandBadge } from '@/components/core/brand/Badge';
 import { Check, ArrowRight, Key, Database, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useAuth } from '@/hooks/useAuth';
+import { authClient } from '@/lib/auth';
+import { API_BASE_URL } from '@/lib/constants';
+import { useSearchParams } from 'next/navigation';
 
 export default function OnboardingPage() {
+  const { user } = useAuth();
+  const searchParams = useSearchParams();
   const [step, setStep] = useState(1);
   const [apiKey, setApiKey] = useState('');
   const [isConnecting, setIsConnecting] = useState(false);
+  const [isSavingKey, setIsSavingKey] = useState(false);
 
   const steps = [
     { id: 1, title: 'API Setup', icon: Key },
@@ -19,21 +26,46 @@ export default function OnboardingPage() {
     { id: 3, title: 'Finish', icon: Zap },
   ];
 
-  const handleNext = () => {
+  useEffect(() => {
+    if ((user as any)?.geminiKey) {
+      setApiKey((user as any).geminiKey || '');
+    }
+  }, [user]);
+
+  useEffect(() => {
+    const notionConnected = Boolean((user as any)?.notionToken);
+    const fromOAuth = searchParams.get('notion') === 'connected';
+    if (fromOAuth || notionConnected) {
+      setStep(3);
+    }
+  }, [searchParams, user]);
+
+  const handleNext = useCallback(() => {
     if (step < 3) {
       setStep(step + 1);
     } else {
       window.location.href = '/dashboard';
     }
-  };
+  }, [step]);
 
-  const connectNotion = () => {
-    setIsConnecting(true);
-    setTimeout(() => {
-      setIsConnecting(false);
+  const handleSaveKey = useCallback(async () => {
+    if (!apiKey) return;
+    setIsSavingKey(true);
+    try {
+      const { error } = await authClient.updateUser({ geminiKey: apiKey } as any);
+      if (error) throw error;
       handleNext();
-    }, 1500);
-  };
+    } catch (err) {
+      alert('Failed to save Gemini API key. Please try again.');
+    } finally {
+      setIsSavingKey(false);
+    }
+  }, [apiKey, handleNext]);
+
+  const connectNotion = useCallback(() => {
+    setIsConnecting(true);
+    window.location.href = `${API_BASE_URL}/notion/oauth/start?returnTo=/onboarding`;
+  }, []);
 
   return (
     <div className="min-h-screen bg-[#ffe17c] flex flex-col items-center justify-center p-8 relative overflow-hidden">
@@ -114,8 +146,8 @@ export default function OnboardingPage() {
                       .
                     </p>
                   </div>
-                  <Button onClick={handleNext} disabled={!apiKey} className="w-full py-4 text-lg">
-                    Continue <ArrowRight className="ml-2 w-5 h-5" />
+                  <Button onClick={handleSaveKey} disabled={!apiKey || isSavingKey} className="w-full py-4 text-lg">
+                    {isSavingKey ? 'Saving...' : 'Continue'} <ArrowRight className="ml-2 w-5 h-5" />
                   </Button>
                 </div>
               )}
