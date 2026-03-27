@@ -4,9 +4,8 @@ import React from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { useAuth } from '@/hooks/useAuth';
 import { X, LogOut, Settings, Shield, User, Mail } from 'lucide-react';
-import { Button } from '@/components/core/brand/Button';
-import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
+import Image from 'next/image';
 
 interface UserAccountDialogProps {
   isOpen: boolean;
@@ -72,7 +71,13 @@ export const UserAccountDialog = ({ isOpen, onOpenChange }: UserAccountDialogPro
                       <div className="absolute -inset-1 bg-black rounded-2xl rotate-3 group-hover:rotate-6 transition-transform" />
                       <div className="relative w-24 h-24 bg-white border-4 border-black rounded-2xl overflow-hidden -rotate-3 group-hover:rotate-0 transition-transform flex items-center justify-center">
                         {user.image ? (
-                          <img src={user.image} alt={user.name} className="w-full h-full object-cover" />
+                          <Image
+                            src={user.image}
+                            alt={user.name || 'User'}
+                            width={96}
+                            height={96}
+                            className="w-full h-full object-cover"
+                          />
                         ) : (
                           <User className="w-12 h-12 text-black/20" />
                         )}

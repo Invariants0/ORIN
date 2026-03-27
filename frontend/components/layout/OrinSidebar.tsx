@@ -2,9 +2,9 @@
 
 import React from 'react';
 import { useOrinStore } from '@/stores/useOrinStore';
-import { Button } from '@/components/core/brand/Button';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
+import Image from 'next/image';
 import {
   Plus,
   MessageSquare,
@@ -110,9 +110,8 @@ export const OrinSidebar = () => {
           sessions.map((session) => {
             const isActive = currentSessionId === session.id;
             return (
-              <button
+              <div
                 key={session.id}
-                onClick={() => openSession(session.id)}
                 className={cn(
                   'w-full text-left px-3 py-2.5 rounded-lg border-2 border-transparent transition-all group flex items-center gap-2.5',
                   isActive
@@ -120,13 +119,19 @@ export const OrinSidebar = () => {
                     : 'hover:bg-white/5'
                 )}
               >
-                <div
+                <button
+                  type="button"
+                  onClick={() => openSession(session.id)}
+                  className="flex items-center gap-2.5 flex-1 min-w-0 text-left"
+                >
+                  <div
                   className={cn(
                     'w-1.5 h-1.5 rounded-full flex-shrink-0',
                     isActive ? 'bg-[#ffe17c]' : 'bg-white/20'
                   )}
                 />
-                <span className="text-xs font-bold truncate flex-1">{session.title}</span>
+                  <span className="text-xs font-bold truncate flex-1">{session.title}</span>
+                </button>
                 <button
                   type="button"
                   onClick={(event) => {
@@ -148,7 +153,7 @@ export const OrinSidebar = () => {
                       : 'opacity-0 -translate-x-1 group-hover:opacity-40 group-hover:translate-x-0'
                   )}
                 />
-              </button>
+              </div>
             );
           })
         )}
@@ -187,7 +192,13 @@ export const OrinSidebar = () => {
           >
             <div className="w-10 h-10 border-2 border-white/20 rounded-xl overflow-hidden flex-shrink-0 group-hover:rotate-3 transition-transform">
               {user.image ? (
-                <img src={user.image} alt={user.name} className="w-full h-full object-cover" />
+                <Image
+                  src={user.image}
+                  alt={user.name || 'User'}
+                  width={40}
+                  height={40}
+                  className="w-full h-full object-cover"
+                />
               ) : (
                 <div className="w-full h-full bg-[#ffe17c] flex items-center justify-center">
                   <span className="text-black font-black text-xs">{user.name[0]}</span>

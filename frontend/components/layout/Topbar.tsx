@@ -15,6 +15,7 @@ import {
   Layers,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import Image from 'next/image';
 
 export const Topbar = () => {
   const { mode, setMode, connections, setIsAccountOpen, user: storeUser } = useOrinStore();
@@ -98,7 +99,13 @@ export const Topbar = () => {
           className="w-10 h-10 rounded-xl border-2 border-black bg-[#ffe17c] overflow-hidden flex-shrink-0 hover:shadow-[3px_3px_0px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all group"
         >
           {user?.image ? (
-            <img src={user.image} alt={user.name} className="w-full h-full object-cover" />
+            <Image
+              src={user.image}
+              alt={user.name || 'User'}
+              width={40}
+              height={40}
+              className="w-full h-full object-cover"
+            />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-[10px] font-black uppercase bg-[#ffe17c]">
               {user?.name?.[0] || 'U'}
