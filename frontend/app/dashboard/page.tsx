@@ -15,7 +15,7 @@ export default function DashboardPage() {
     if (!currentSessionId) {
       newSession();
     }
-  }, []);
+  }, [currentSessionId, newSession]);
 
   const handleSuggestionClick = useCallback((text: string) => {
     inputPrefillRef.current?.(text);
