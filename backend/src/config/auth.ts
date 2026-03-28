@@ -13,15 +13,11 @@ export const auth = betterAuth({
   },
 
   database: prismaAdapter(db, {
-    provider: "postgresql", // Changed from sqlite to match schema.prisma
+    provider: "postgresql", 
   }),
   user: {
     additionalFields: {
       geminiKey: {
-        type: "string",
-        required: false,
-      },
-      notionToken: {
         type: "string",
         required: false,
       },
