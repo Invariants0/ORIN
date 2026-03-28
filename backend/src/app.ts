@@ -13,6 +13,9 @@ import { APIError } from "@/utils/errors.js";
 
 const app = express();
 
+// Trust Render's proxy for secure cookies and rate-limiting
+app.set('trust proxy', 1);
+
 /**
  * 🛠️ PRODUCTION HARDENING & ENHANCEMENTS
  */
