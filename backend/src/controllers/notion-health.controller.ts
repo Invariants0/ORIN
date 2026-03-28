@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import catchAsync from "@/handlers/async.handler.js";
 import notionMcpService from "@/services/integrations/notion-mcp.service.js";
+import notionService from "@/services/integrations/notion.service.js";
 import envVars from "@/config/envVars.js";
 import logger from "@/config/logger.js";
 import db from "@/config/database.js";
@@ -15,83 +16,66 @@ export const checkNotionHealth = catchAsync(async (req: Request, res: Response) 
   logger.info('[Notion Health] Checking Notion integration status', { userId });
 
   try {
-    // Get user's token if available
-    let token = envVars.NOTION_MCP_TOKEN;
-    if (userId) {
-      const user = await db.user.findUnique({ where: { id: userId } });
-      token = user?.notionToken || token;
-    }
+    const user = userId ? await db.user.findUnique({ where: { id: userId } }) as any : null;
+    const restToken = user?.notionRestAccessToken || user?.notionToken || envVars.NOTION_API_KEY || null;
+    const mcpToken = user?.notionMcpAccessToken || envVars.NOTION_MCP_TOKEN || null;
 
-    if (!token) {
-      return res.status(200).json({
-        success: true,
-        data: {
-          connected: false,
-          reason: 'No Notion token configured',
-          message: 'Please configure NOTION_MCP_TOKEN in your environment variables or connect your Notion account.',
-          tokenFormat: null
-        }
-      });
-    }
+    const restStatus = {
+      connected: false,
+      message: 'Notion REST is not connected',
+      reason: 'No REST token configured'
+    } as any;
 
-    const tokenPrefix = token.substring(0, 10);
-    const provider = envVars.NOTION_PROVIDER || "mcp";
+    const mcpStatus = {
+      connected: false,
+      message: 'Notion MCP is not connected',
+      reason: 'No MCP token configured'
+    } as any;
 
-    // For REST, enforce known token prefixes; for MCP, validate by calling MCP.
-    if (provider === "rest") {
-      const isValidFormat = token.startsWith('secret_') || token.startsWith('ntn_');
-      if (!isValidFormat) {
-        return res.status(200).json({
-          success: true,
-          data: {
-            connected: false,
-            reason: 'Invalid token format',
-            message: 'Notion REST token should start with "secret_" or "ntn_"',
-            tokenFormat: 'invalid',
-            tokenPrefix: tokenPrefix + '****'
-          }
-        });
+    if (restToken) {
+      try {
+        await notionService.getCurrentUser(restToken);
+        restStatus.connected = true;
+        restStatus.message = 'Notion REST is working correctly';
+        restStatus.reason = null;
+      } catch (restError: any) {
+        restStatus.connected = false;
+        restStatus.reason = restError.message || 'REST connection error';
       }
     }
 
-    // Try a lightweight search to test access
-    try {
-      await notionMcpService.search('test', token);
-      
-      return res.status(200).json({
-        success: true,
-        data: {
-          connected: true,
-          message: 'Notion integration is working correctly',
-          tokenFormat: token.startsWith('ntn_') ? 'new' : token.startsWith('secret_') ? 'legacy' : 'unknown',
-          tokenPrefix: tokenPrefix + '****'
+    if (mcpToken) {
+      try {
+        await notionMcpService.search('test', mcpToken);
+        mcpStatus.connected = true;
+        mcpStatus.message = 'Notion MCP is working correctly';
+        mcpStatus.reason = null;
+      } catch (mcpError: any) {
+        if (isNotionPermissionError(mcpError)) {
+          mcpStatus.connected = false;
+          mcpStatus.reason = 'No page access';
+          mcpStatus.message = getNotionErrorMessage(mcpError);
+          mcpStatus.instructions = [
+            '1. Open your Notion workspace',
+            '2. Navigate to Settings & Members > Connections',
+            '3. Find the ORIN integration',
+            '4. Share a page or database with the integration',
+            '5. Try again'
+          ];
+        } else {
+          mcpStatus.connected = false;
+          mcpStatus.reason = mcpError.message || 'MCP connection error';
         }
-      });
-
-    } catch (searchError: any) {
-      if (isNotionPermissionError(searchError)) {
-        return res.status(200).json({
-          success: true,
-          data: {
-            connected: false,
-            reason: 'No page access',
-            message: getNotionErrorMessage(searchError),
-            tokenFormat: token.startsWith('ntn_') ? 'new' : token.startsWith('secret_') ? 'legacy' : 'unknown',
-            tokenPrefix: tokenPrefix + '****',
-            instructions: [
-              '1. Open your Notion workspace',
-              '2. Navigate to Settings & Members > Connections',
-              '3. Find the ORIN integration',
-              '4. Share a page or database with the integration',
-              '5. Try again'
-            ]
-          }
-        });
       }
-
-      throw searchError;
     }
 
+    return res.status(200).json({
+      success: true,
+      data: {
+        rest: restStatus,
+        mcp: mcpStatus
+      }
+    });
   } catch (error: any) {
     logger.error('[Notion Health] Health check failed', { 
       error: error.message,
@@ -122,16 +106,16 @@ export const getConnectionInstructions = catchAsync(async (req: Request, res: Re
         {
           step: 1,
           title: 'Choose your Notion connection method',
-          description: 'ORIN supports Notion MCP (recommended for hackathon) and Notion REST (fallback).',
+          description: 'ORIN supports Notion MCP (primary for agent search) and Notion REST (deterministic CRUD).',
           details: [
-            'MCP: Use a Notion MCP access token (server-to-server) or connect via OAuth in the app.',
-            'REST: Use a Notion Integration token (secret_/ntn_) from https://www.notion.so/my-integrations.'
+            'MCP: Connect via OAuth in the app to enable MCP tool calls.',
+            'REST: Connect via OAuth in the app for REST API writes.'
           ]
         },
         {
           step: 2,
           title: 'Add Token to ORIN',
-          description: 'For server-side MCP, add the MCP token to your backend .env file. For OAuth, just connect in-app.',
+          description: 'For OAuth, connect in-app. For server-side MCP fallback, add NOTION_MCP_TOKEN in backend .env.',
           details: [
             'Open backend/.env',
             'Set NOTION_MCP_TOKEN=your_token_here',
@@ -164,7 +148,7 @@ export const getConnectionInstructions = catchAsync(async (req: Request, res: Re
       troubleshooting: [
         {
           issue: 'Token format error',
-          solution: 'Make sure your token starts with "secret_" or "ntn_". Old tokens start with "secret_", new tokens start with "ntn_".'
+          solution: 'For REST tokens, Notion issues "secret_" or "ntn_" formats. MCP OAuth tokens do not use these prefixes.'
         },
         {
           issue: 'Permission denied / 401 error',
