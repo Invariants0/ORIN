@@ -31,8 +31,12 @@ export enum PromptTemplate {
 class PromptEngineService {
   private genAI: GoogleGenerativeAI;
   private model: any;
-  private readonly MAX_RETRIES = 2;
+  private readonly MAX_RETRIES = 1; // Reduced from 2 to minimize API usage
   private readonly DEFAULT_TEMPERATURE = 0.7;
+  
+  // Response cache to prevent duplicate API calls
+  private responseCache = new Map<string, { data: any; timestamp: number }>();
+  private readonly CACHE_TTL = 60000; // 60 seconds
 
   constructor() {
     const apiKey = envVars.GEMINI_API_KEY 
@@ -70,6 +74,27 @@ class PromptEngineService {
     // Mock Mode Support
     if (isMock) {
       return this.generateMockResponse(config);
+    }
+
+    // Check cache first (skip for custom API keys to respect user-specific quotas)
+    if (!config.apiKey) {
+      const cacheKey = `${config.systemPrompt.substring(0, 100)}:${config.userInput}`;
+      const cached = this.responseCache.get(cacheKey);
+      
+      if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
+        logger.info('[Prompt Engine] Using cached response', {
+          cacheAge: Math.round((Date.now() - cached.timestamp) / 1000) + 's'
+        });
+        return {
+          status: 'success',
+          data: cached.data,
+          metadata: {
+            attempts: 0,
+            processingTimeMs: 0,
+            model: 'cached'
+          }
+        };
+      }
     }
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -113,6 +138,13 @@ class PromptEngineService {
           processingTimeMs
         });
 
+        // Cache successful response (skip for custom API keys)
+        if (!config.apiKey) {
+          const cacheKey = `${config.systemPrompt.substring(0, 100)}:${config.userInput}`;
+          this.responseCache.set(cacheKey, { data: parsedData, timestamp: Date.now() });
+          logger.debug('[Prompt Engine] Response cached', { cacheKey: cacheKey.substring(0, 50) });
+        }
+
         return {
           status: 'success',
           data: parsedData as T,
@@ -125,15 +157,40 @@ class PromptEngineService {
 
       } catch (error: any) {
         lastError = error;
+        
+        // Detect rate limit errors (429)
+        const is429 = error.message?.includes('429') || 
+                      error.message?.includes('quota') ||
+                      error.message?.includes('Too Many Requests') ||
+                      error.message?.includes('Resource has been exhausted') ||
+                      error.status === 429 ||
+                      error.code === 429;
+        
         logger.warn('[Prompt Engine] Attempt failed', {
           attempt: attempt + 1,
           error: error.message,
-          willRetry: attempt < maxRetries
+          errorType: is429 ? 'RATE_LIMIT' : 'OTHER',
+          willRetry: attempt < maxRetries && !is429
         });
 
+        // For rate limit errors, fail immediately without retry
+        if (is429) {
+          logger.error('[Prompt Engine] Rate limit exceeded - failing fast', {
+            attempt: attempt + 1,
+            error: error.message,
+            recommendation: 'Wait 60 seconds or reduce request frequency'
+          });
+          throw new Error(`RATE_LIMIT_EXCEEDED: Gemini API quota exhausted (20 requests/minute on free tier). Please wait 60 seconds before retrying, or consider upgrading to a paid tier for higher limits.`);
+        }
+
+        // For other errors, retry with exponential backoff
         if (attempt < maxRetries) {
-          // Wait before retry (exponential backoff)
-          await this.sleep(Math.pow(2, attempt) * 500);
+          const delay = Math.pow(2, attempt) * 2000; // Increased from 500ms to 2000ms
+          logger.info('[Prompt Engine] Retrying after delay', { 
+            delayMs: delay,
+            nextAttempt: attempt + 2 
+          });
+          await this.sleep(delay);
         }
       }
     }

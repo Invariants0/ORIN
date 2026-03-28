@@ -4,7 +4,10 @@ import {
   Intent,
   IntentType,
   IntentDetectionResult,
-  UnclearIntent
+  UnclearIntent,
+  StoreIntent,
+  QueryIntent,
+  GenerateDocIntent
 } from '@/types/intent.types.js';
 
 class IntentDetectionService {
@@ -17,6 +20,28 @@ class IntentDetectionService {
 
     try {
       logger.info('[Intent] Starting intent detection', { inputLength: userInput.length });
+
+      // Try rule-based detection first (no API call needed)
+      const ruleBasedIntent = this.tryRuleBasedDetection(userInput);
+      if (ruleBasedIntent) {
+        logger.info('[Intent] Rule-based intent detected', { 
+          intentType: ruleBasedIntent.type,
+          method: 'rule-based'
+        });
+        
+        const confidence = this.calculateConfidence(ruleBasedIntent, userInput);
+        const processingTimeMs = Date.now() - startTime;
+        
+        return {
+          intent: ruleBasedIntent,
+          confidence,
+          rawInput: userInput,
+          processingTimeMs
+        };
+      }
+
+      // Fallback to AI-based detection for ambiguous cases
+      logger.info('[Intent] Using AI-based detection for ambiguous input');
 
       // Use prompt engine for structured response
       const response = await promptEngineService.generateFromTemplate(
@@ -64,6 +89,83 @@ class IntentDetectionService {
         processingTimeMs
       };
     }
+  }
+
+  /**
+   * Try to detect intent using simple rules (no API call)
+   * Returns null if intent is ambiguous and needs AI
+   */
+  private tryRuleBasedDetection(userInput: string): Intent | null {
+    const input = userInput.toLowerCase().trim();
+    
+    // STORE intent patterns
+    const storeKeywords = ['save', 'store', 'remember', 'keep', 'note this', 'add this', 'record'];
+    if (storeKeywords.some(kw => input.startsWith(kw) || input.includes(kw + ' this') || input.includes(kw + ' that'))) {
+      // Extract content (remove the command part)
+      let content = userInput;
+      for (const kw of storeKeywords) {
+        const patterns = [
+          new RegExp(`^${kw}\\s+this:?\\s*`, 'i'),
+          new RegExp(`^${kw}\\s+that:?\\s*`, 'i'),
+          new RegExp(`^${kw}:?\\s+`, 'i')
+        ];
+        for (const pattern of patterns) {
+          if (pattern.test(content)) {
+            content = content.replace(pattern, '').trim();
+            break;
+          }
+        }
+      }
+      
+      if (content.length > 5) {
+        return {
+          type: IntentType.STORE,
+          content,
+          suggestedTitle: content.substring(0, 50),
+          tags: [],
+          category: 'user-input'
+        } as StoreIntent;
+      }
+    }
+    
+    // QUERY intent patterns
+    const queryStarters = ['what', 'find', 'search', 'tell me', 'show me', 'get', 'retrieve', 'where', 'when', 'who', 'how'];
+    if (queryStarters.some(kw => input.startsWith(kw)) || input.includes('?')) {
+      const question = userInput.trim();
+      const searchTerms = question
+        .toLowerCase()
+        .replace(/[^\w\s]/g, ' ')
+        .split(/\s+/)
+        .filter(word => word.length > 3)
+        .slice(0, 5);
+      
+      return {
+        type: IntentType.QUERY,
+        question,
+        searchTerms,
+        contextNeeded: true
+      } as QueryIntent;
+    }
+    
+    // GENERATE_DOC intent patterns
+    const generateKeywords = ['create document', 'generate document', 'write document', 'draft', 'create doc', 'make document'];
+    if (generateKeywords.some(kw => input.includes(kw))) {
+      const topic = userInput.replace(/create|generate|write|draft|make/gi, '').replace(/document|doc/gi, '').trim();
+      return {
+        type: IntentType.GENERATE_DOC,
+        topic: topic || 'Untitled Document',
+        documentType: 'general',
+        requirements: []
+      } as GenerateDocIntent;
+    }
+    
+    // If input is too short or ambiguous, return null (needs AI)
+    if (input.length < 10) {
+      return null;
+    }
+    
+    // Return null for ambiguous cases that need AI analysis
+    return null;
   }
 
   /**
