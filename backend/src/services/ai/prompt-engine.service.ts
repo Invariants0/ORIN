@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import envVars from '@/config/envVars.js';
 import logger from '@/config/logger.js';
+import { GeminiAPIError } from '@/utils/errors.js';
 
 export interface PromptEngineConfig {
   systemPrompt: string;
@@ -158,6 +159,12 @@ class PromptEngineService {
       } catch (error: any) {
         lastError = error;
         
+        // Detect API key errors
+        const isAPIKeyError = error.message?.includes('API Key not found') || 
+                              error.message?.includes('API_KEY_INVALID') ||
+                              error.message?.includes('API key not valid') ||
+                              error.message?.includes('invalid API key');
+        
         // Detect rate limit errors (429)
         const is429 = error.message?.includes('429') || 
                       error.message?.includes('quota') ||
@@ -169,18 +176,28 @@ class PromptEngineService {
         logger.warn('[Prompt Engine] Attempt failed', {
           attempt: attempt + 1,
           error: error.message,
-          errorType: is429 ? 'RATE_LIMIT' : 'OTHER',
-          willRetry: attempt < maxRetries && !is429
+          errorType: isAPIKeyError ? 'API_KEY_ERROR' : is429 ? 'RATE_LIMIT' : 'OTHER',
+          willRetry: attempt < maxRetries && !isAPIKeyError && !is429
         });
 
-        // For rate limit errors, fail immediately without retry
+        // For API key errors, fail immediately with user-friendly error
+        if (isAPIKeyError) {
+          logger.error('[Prompt Engine] API key error detected', {
+            attempt: attempt + 1,
+            error: error.message,
+            recommendation: 'User needs to update their Gemini API key'
+          });
+          throw GeminiAPIError.invalidKey();
+        }
+
+        // For rate limit errors, fail immediately with user-friendly error
         if (is429) {
           logger.error('[Prompt Engine] Rate limit exceeded - failing fast', {
             attempt: attempt + 1,
             error: error.message,
             recommendation: 'Wait 60 seconds or reduce request frequency'
           });
-          throw new Error(`RATE_LIMIT_EXCEEDED: Gemini API quota exhausted (20 requests/minute on free tier). Please wait 60 seconds before retrying, or consider upgrading to a paid tier for higher limits.`);
+          throw GeminiAPIError.rateLimited();
         }
 
         // For other errors, retry with exponential backoff
@@ -363,14 +380,34 @@ Return ONLY the JSON object. No markdown, no explanation, no extra text.`;
   private getIntentClassificationTemplate(userInput: string): PromptEngineConfig {
     return {
       systemPrompt: `You are an intent classification system for ORIN, a Context Operating System.
- 
+
 Your task: Analyze the user input and classify it into ONE of these intents:
- 
-1. STORE - User wants to save information, knowledge, notes, or data. Data to extract: { content, suggestedTitle, tags, category }
-2. QUERY - User wants to retrieve info or search memory. Data to extract: { question, searchTerms }
-3. GENERATE_DOC - User wants to create a document. Data to extract: { topic, documentType, requirements }
-4. OPERATE - User wants to execute a workflow. Data to extract: { action, parameters }
-5. UNCLEAR - Ambiguous or fits none. Data to extract: { reason, clarificationNeeded }`,
+
+1. STORE - User wants to save information, knowledge, notes, or data. Examples: "save this", "remember that", "note this down"
+   Data to extract: { content, suggestedTitle, tags, category }
+
+2. QUERY - User wants to retrieve info or search memory. Examples: "find notes about", "search for", "what was"
+   Data to extract: { question, searchTerms }
+
+3. GENERATE_DOC - User wants to CREATE A NEW DOCUMENT or WRITTEN CONTENT (essay, blog, email, article, etc). 
+   Examples: "write an essay", "draft an email", "create a blog post"
+   Data to extract: { topic, documentType, requirements }
+   
+4. OPERATE - User wants to EXECUTE A WORKFLOW or PERFORM A DIRECT ACTION on system/Notion objects.
+   Examples: "create a new page", "list my Notion pages", "update the task", "delete this workflow"
+   This includes: creating/updating/listing/deleting pages, tasks, workflows, connections, integrations
+   Data to extract: { action, parameters }
+
+5. UNCLEAR - Ambiguous or fits none. 
+   Data to extract: { reason, clarificationNeeded }
+
+CRITICAL DISTINCTION:
+- "create a page" = OPERATE (create page object in Notion)
+- "write a page" = OPERATE if referring to page in Notion, GENERATE_DOC if referring to content document
+- "create a blog post" = GENERATE_DOC (written content)
+- "create a document" = GENERATE_DOC (written content)
+
+Focus on ACTION VERBS and OBJECT TYPES to disambiguate.`,
       userInput,
       schema: {
         type: 'string',

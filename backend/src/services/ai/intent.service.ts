@@ -7,7 +7,8 @@ import {
   UnclearIntent,
   StoreIntent,
   QueryIntent,
-  GenerateDocIntent
+  GenerateDocIntent,
+  OperateIntent
 } from '@/types/intent.types.js';
 
 class IntentDetectionService {
@@ -147,10 +148,65 @@ class IntentDetectionService {
       } as QueryIntent;
     }
     
-    // GENERATE_DOC intent patterns
-    const generateKeywords = ['create document', 'generate document', 'write document', 'draft', 'create doc', 'make document'];
+    // OPERATE intent patterns (direct actions) - CHECK THESE FIRST
+    // Must come before GENERATE_DOC because "create" is ambiguous
+    const operateKeywords = ['create', 'add', 'update', 'delete', 'remove', 'integrate', 'list', 'fetch', 'get', 'build', 'make', 'set', 'enable', 'disable'];
+    const notionPageKeywords = ['page', 'task', 'workflow', 'item', 'note', 'database', 'view', 'connection'];
+    
+    // Check if this is an OPERATE action on a Notion/system object (not a document)
+    // Look for action keywords at start OR early in input (handles missing first char "reate" for "create")
+    let action = '';
+    for (const kw of operateKeywords) {
+      if (input.startsWith(kw)) {
+        action = kw;
+        break;
+      }
+      // Also match if missing first character (e.g., "reate" for "create")
+      const partialKw = kw.substring(1);
+      if (input.startsWith(partialKw) && kw.length > 3) {
+        action = kw;
+        break;
+      }
+    }
+    
+    if (action) {
+      const restOfInput = userInput.replace(new RegExp(`^${action}\\s+(?:a|an|the)?\\s*`, 'i'), '').trim();
+      
+      // If it mentions Notion/system objects, it's definitely OPERATE
+      const isSystemObject = notionPageKeywords.some(kw => input.includes(kw));
+      
+      // If action is "create" but mentions page/task/workflow, it's OPERATE not GENERATE_DOC
+      if (action === 'create' && isSystemObject) {
+        return {
+          type: IntentType.OPERATE,
+          action,
+          parameters: {
+            target: restOfInput,
+            fullInput: userInput
+          },
+          requiresConfirmation: false
+        } as OperateIntent;
+      }
+      
+      // For other direct actions, it's OPERATE
+      if (action !== 'create') {
+        const requiresConfirmation = ['delete', 'remove'].includes(action);
+        return {
+          type: IntentType.OPERATE,
+          action,
+          parameters: {
+            target: restOfInput,
+            fullInput: userInput
+          },
+          requiresConfirmation
+        } as OperateIntent;
+      }
+    }
+    
+    // GENERATE_DOC intent patterns (only for actual documents)
+    const generateKeywords = ['create document', 'generate document', 'write document', 'draft', 'create doc', 'make document', 'write a blog', 'compose email'];
     if (generateKeywords.some(kw => input.includes(kw))) {
-      const topic = userInput.replace(/create|generate|write|draft|make/gi, '').replace(/document|doc/gi, '').trim();
+      const topic = userInput.replace(/create|generate|write|draft|make|compose/gi, '').replace(/document|doc|blog|email/gi, '').trim();
       return {
         type: IntentType.GENERATE_DOC,
         topic: topic || 'Untitled Document',
@@ -182,6 +238,38 @@ class IntentDetectionService {
         type: data.type,
         ...(data.extractedData || {})
       };
+
+      // Handle OPERATE intent conversion from AI response format
+      if (normalized.type === IntentType.OPERATE) {
+        const params = normalized.parameters || {};
+        
+        // Convert AI response format to expected format
+        // AI returns: { objectType, name } or { action, parameters: {...} }
+        // We need: { target, fullInput }, requiresConfirmation: boolean
+        
+        let target = '';
+        if (params.name) {
+          target = params.name; // Just the name
+        } else if (params.target) {
+          target = params.target; // Already in correct format
+        } else {
+          // Try to reconstruct from action + objectType
+          const objectType = params.objectType || 'item';
+          target = `${objectType}${params.name ? ' named ' + params.name : ''}`;
+        }
+
+        // Rebuild parameters with expected structure
+        normalized.parameters = {
+          target: target || 'unknown',
+          fullInput: data.fullInput || data.userInput || `${normalized.action} ${target}`
+        };
+
+        // Ensure requiresConfirmation boolean
+        if (typeof normalized.requiresConfirmation !== 'boolean') {
+          const action = normalized.action || '';
+          normalized.requiresConfirmation = ['delete', 'remove', 'destroy'].includes(action.toLowerCase());
+        }
+      }
 
       // Coerce QUERY fields when model returns string instead of array
       if (normalized.type === IntentType.QUERY) {
@@ -241,8 +329,13 @@ class IntentDetectionService {
         break;
       
       case IntentType.OPERATE:
-        if (!intent.action || typeof intent.requiresConfirmation !== 'boolean') {
-          throw new Error('OPERATE intent missing required fields');
+        // Only require action; requiresConfirmation is optional and defaults based on action
+        if (!intent.action) {
+          throw new Error('OPERATE intent missing action');
+        }
+        // Ensure parameters object exists
+        if (!intent.parameters || typeof intent.parameters !== 'object') {
+          throw new Error('OPERATE intent missing parameters');
         }
         break;
       
