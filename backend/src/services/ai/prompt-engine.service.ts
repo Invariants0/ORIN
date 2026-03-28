@@ -9,6 +9,7 @@ export interface PromptEngineConfig {
   schema: Record<string, any>;
   apiKey?: string;
   maxRetries?: number;
+  maxOutputTokens?: number;
   temperature?: number;
 }
 
@@ -34,6 +35,7 @@ class PromptEngineService {
   private model: any;
   private readonly MAX_RETRIES = 1; // Reduced from 2 to minimize API usage
   private readonly DEFAULT_TEMPERATURE = 0.2;
+  private readonly DEFAULT_MAX_OUTPUT_TOKENS = 2048;
   
   // Response cache to prevent duplicate API calls
   private responseCache = new Map<string, { data: any; timestamp: number }>();
@@ -47,7 +49,7 @@ class PromptEngineService {
       model: modelName,
       generationConfig: {
         temperature: this.DEFAULT_TEMPERATURE,
-        maxOutputTokens: 2048,
+        maxOutputTokens: this.DEFAULT_MAX_OUTPUT_TOKENS,
         candidateCount: 1,
         responseMimeType: 'application/json'
       }
@@ -114,7 +116,7 @@ class PromptEngineService {
           model: envVars.GEMINI_MODEL,
           generationConfig: {
               temperature: config.temperature ?? this.DEFAULT_TEMPERATURE,
-              maxOutputTokens: 2048,
+              maxOutputTokens: config.maxOutputTokens ?? this.DEFAULT_MAX_OUTPUT_TOKENS,
               candidateCount: 1,
               responseMimeType: 'application/json'
             }
@@ -580,7 +582,8 @@ The content should be comprehensive and well-organized.`,
         content: 'string',
         sections: 'array',
         metadata: 'object'
-      }
+      },
+      maxOutputTokens: 8192
     };
   }
 

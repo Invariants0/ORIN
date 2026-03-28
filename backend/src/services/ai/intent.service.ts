@@ -148,8 +148,48 @@ class IntentDetectionService {
       } as QueryIntent;
     }
     
-    // OPERATE intent patterns (direct actions) - CHECK THESE FIRST
-    // Must come before GENERATE_DOC because "create" is ambiguous
+    // GENERATE_DOC intent patterns for written outputs
+    const docTypes = [
+      'business plan',
+      'plan',
+      'proposal',
+      'report',
+      'essay',
+      'article',
+      'blog post',
+      'blog',
+      'email',
+      'pitch deck',
+      'pitch',
+      'document',
+      'doc'
+    ];
+    const docActions = ['create', 'generate', 'write', 'draft', 'make', 'build'];
+    const matchedDocType = docTypes.find((type) => input.includes(type));
+    const hasDocAction = docActions.some((action) => input.startsWith(action));
+
+    if (matchedDocType && hasDocAction) {
+      const cleanedTopic = userInput
+        .replace(/^(create|generate|write|draft|make|build)\s+/i, '')
+        .trim();
+
+      const requirements: string[] = [];
+      if (input.includes('from my notes')) {
+        requirements.push('notes');
+      }
+      if (input.includes('from notes')) {
+        requirements.push('notes');
+      }
+
+      return {
+        type: IntentType.GENERATE_DOC,
+        topic: cleanedTopic || matchedDocType,
+        documentType: matchedDocType,
+        requirements
+      } as GenerateDocIntent;
+    }
+
+    // OPERATE intent patterns (direct actions)
     const operateKeywords = ['create', 'add', 'update', 'delete', 'remove', 'integrate', 'list', 'fetch', 'get', 'build', 'make', 'set', 'enable', 'disable'];
     const notionPageKeywords = ['page', 'task', 'workflow', 'item', 'note', 'database', 'view', 'connection'];
     
