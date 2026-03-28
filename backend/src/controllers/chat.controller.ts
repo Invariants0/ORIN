@@ -4,204 +4,95 @@ import { APIError } from "@/utils/errors.js";
 import orchestratorService from "@/services/orchestration/orchestrator.service.js";
 import sessionService from "@/services/infrastructure/session.service.js";
 import logger from "@/config/logger.js";
+import { sendSuccess } from "@/utils/response.js";
 
 /**
- * Main chat endpoint - All user interactions flow through orchestrator
+ * Main chat endpoint - Production Graded
+ * Logic:
+ * 1. Derives secure context (userId, sessionId)
+ * 2. Persists User/Assistant messages
+ * 3. Bridges to AI Orchestrator
  */
 export const sendMessage = catchAsync(async (req: Request, res: Response) => {
   const { message, sessionId } = req.body;
+  const userId = req.user!.id; // Non-null check safe due to authenticate middleware
 
-  // Validate input
-  if (!message || typeof message !== 'string' || message.trim().length === 0) {
-    throw APIError.badRequest("Message is required and must be a non-empty string");
+  logger.info('[Chat Controller] Processing message', { userId, sessionId });
+
+  // 1. Context initialization
+  let currentSessionId = sessionId;
+  let isNewSession = false;
+
+  if (!currentSessionId) {
+    const title = sessionService.generateSessionTitle(message);
+    const session = await sessionService.createSession({ userId, title });
+    currentSessionId = session.id;
+    isNewSession = true;
+  } else {
+    const session = await sessionService.getSession(currentSessionId);
+    if (!session) throw APIError.notFound('Session not found');
+    if (session.userId !== userId) throw APIError.forbidden('Access denied');
   }
 
-  if (message.length > 10000) {
-    throw APIError.badRequest("Message exceeds maximum length of 10000 characters");
-  }
-
-  // Ensure user is authenticated via middleware
-  const userId = (req as any).user?.id;
-  if (!userId) {
-    throw APIError.unauthorized("Authentication required to send message");
-  }
-  
-  // Ensure user exists in database
-  await sessionService.ensureUserExists(userId);
-
-  logger.info('[Chat Controller] Processing message', { 
-    userId, 
-    sessionId: sessionId || 'new',
-    messageLength: message.length,
-    messagePreview: message.substring(0, 50)
+  // 2. Persist user input
+  await sessionService.addMessage({
+    sessionId: currentSessionId as string,
+    role: 'user',
+    content: (message as string).trim()
   });
 
-  try {
-    // Step 1: Get or create session
-    let currentSessionId = sessionId;
-    let isNewSession = false;
+  // 3. AI Execution (Centralized Orchestrator)
+  const result = await orchestratorService.handleUserInput((message as string).trim(), userId, currentSessionId as string);
 
-    if (!currentSessionId) {
-      // Create new session
-      const title = sessionService.generateSessionTitle(message);
-      const session = await sessionService.createSession({
-        userId,
-        title
-      });
-      currentSessionId = session.id;
-      isNewSession = true;
-
-      logger.info('[Chat Controller] New session created', { 
-        sessionId: currentSessionId,
-        userId 
-      });
-    } else {
-      // Verify session exists and belongs to user
-      const session = await sessionService.getSession(currentSessionId);
-      if (!session) {
-        throw APIError.notFound('Session not found');
-      }
-      if (session.userId !== userId) {
-        throw APIError.forbidden('Access denied to this session');
-      }
+  // 4. Persist assistant output
+  await sessionService.addMessage({
+    sessionId: currentSessionId,
+    role: 'assistant',
+    content: result.output,
+    intent: result.intent,
+    metadata: {
+      confidence: result.metadata.confidence,
+      processingTimeMs: result.metadata.processingTimeMs,
+      servicesUsed: result.metadata.servicesUsed,
+      actions: result.actions
     }
+  });
 
-    // Step 2: Store user message
-    await sessionService.addMessage({
-      sessionId: currentSessionId,
-      role: 'user',
-      content: message.trim()
-    });
-
-    // Step 3: Process through orchestrator (single entry point)
-    const result = await orchestratorService.handleUserInput(
-      message.trim(), 
-      userId,
-      currentSessionId
-    );
-
-    // Step 4: Store assistant response
-    await sessionService.addMessage({
-      sessionId: currentSessionId,
-      role: 'assistant',
-      content: result.output,
-      intent: result.intent,
-      metadata: {
-        confidence: result.metadata.confidence,
-        processingTimeMs: result.metadata.processingTimeMs,
-        servicesUsed: result.metadata.servicesUsed,
-        actions: result.actions
-      }
-    });
-
-    logger.info('[Chat Controller] Message processed successfully', {
-      userId,
-      sessionId: currentSessionId,
-      intent: result.intent,
-      processingTimeMs: result.metadata.processingTimeMs
-    });
-
-    // Return standardized response with session info
-    res.status(200).json({
-      success: true,
-      data: {
-        ...result,
-        sessionId: currentSessionId,
-        isNewSession
-      }
-    });
-
-  } catch (error: any) {
-    logger.error('[Chat Controller] Error processing message', {
-      userId,
-      error: error.message,
-      stack: error.stack
-    });
-
-    // Always return a response, never hang
-    res.status(error.statusCode || 500).json({
-      success: false,
-      error: {
-        message: error.message || 'An error occurred processing your message',
-        code: error.statusCode || 500
-      }
-    });
-  }
+  // 5. Standardized response
+  sendSuccess(res, {
+    ...result,
+    sessionId: currentSessionId,
+    isNewSession
+  }, "Message processed successfully");
 });
 
-/**
- * Get session history
- */
 export const getSession = catchAsync(async (req: Request, res: Response) => {
   const sessionId = req.params.sessionId as string;
-  const userId = (req as any).user?.id;
-  if (!userId) throw APIError.unauthorized("Authentication required");
-
-  logger.info('[Chat Controller] Fetching session', { sessionId, userId });
+  const userId = req.user!.id;
 
   const session = await sessionService.getSession(sessionId);
+  if (!session) throw APIError.notFound('Session not found');
+  if (session.userId !== userId) throw APIError.forbidden('Access denied');
 
-  if (!session) {
-    throw APIError.notFound('Session not found');
-  }
-
-  if (session.userId !== userId) {
-    throw APIError.forbidden('Access denied to this session');
-  }
-
-  res.status(200).json({
-    success: true,
-    data: session
-  });
+  sendSuccess(res, session);
 });
 
-/**
- * Get user's sessions
- */
 export const getUserSessions = catchAsync(async (req: Request, res: Response) => {
-  const userId = (req as any).user?.id;
-  if (!userId) throw APIError.unauthorized("Authentication required");
-  const limit = parseInt(req.query.limit as string) || 20;
-
-  logger.info('[Chat Controller] Fetching user sessions', { userId, limit });
+  const userId = req.user!.id;
+  const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
 
   const sessions = await sessionService.getUserSessions(userId, limit);
-
-  res.status(200).json({
-    success: true,
-    data: {
-      sessions,
-      total: sessions.length
-    }
-  });
+  sendSuccess(res, { sessions, total: sessions.length });
 });
 
-/**
- * Delete a session
- */
 export const deleteSession = catchAsync(async (req: Request, res: Response) => {
   const sessionId = req.params.sessionId as string;
-  const userId = (req as any).user?.id;
-  if (!userId) throw APIError.unauthorized("Authentication required");
-
-  logger.info('[Chat Controller] Deleting session', { sessionId, userId });
+  const userId = req.user!.id;
 
   const session = await sessionService.getSession(sessionId);
-
-  if (!session) {
-    throw APIError.notFound('Session not found');
-  }
-
-  if (session.userId !== userId) {
-    throw APIError.forbidden('Access denied to this session');
-  }
+  if (!session) throw APIError.notFound('Session not found');
+  if (session.userId !== userId) throw APIError.forbidden('Access denied');
 
   await sessionService.deleteSession(sessionId);
-
-  res.status(200).json({
-    success: true,
-    message: 'Session deleted successfully'
-  });
+  sendSuccess(res, null, 'Session deleted successfully');
 });
-
-

@@ -1,91 +1,51 @@
-// Multi-Agent Controller - Phase 20
-
 import { Request, Response } from 'express';
+import { z } from 'zod';
 import multiAgentOrchestratorService from '@/services/orchestration/multi-agent-orchestrator.service.js';
 import logger from '@/config/logger.js';
+import catchAsync from '@/handlers/async.handler.js';
+import { sendSuccess } from '@/utils/response.js';
+import { APIError } from '@/utils/errors.js';
 
-/**
- * Initialize multi-agent system
- */
-export async function initializeSystem(req: Request, res: Response) {
-  try {
+const querySchema = z.object({
+  query: z.string().min(1),
+  sessionId: z.string().optional()
+});
+
+class MultiAgentController {
+  /**
+   * Initialize multi-agent system
+   */
+  initializeSystem = catchAsync(async (req: Request, res: Response) => {
     logger.info('[MultiAgentController] Initialize request received');
-
     await multiAgentOrchestratorService.initialize();
+    sendSuccess(res, { timestamp: new Date() }, 'Multi-agent system initialized successfully');
+  });
 
-    res.json({
-      success: true,
-      message: 'Multi-agent system initialized successfully',
-      timestamp: new Date()
-    });
-
-  } catch (error: any) {
-    logger.error('[MultiAgentController] Initialize failed', { error: error.message });
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-}
-
-/**
- * Get system statistics
- */
-export async function getSystemStats(req: Request, res: Response) {
-  try {
+  /**
+   * Get system statistics
+   */
+  getSystemStats = catchAsync(async (req: Request, res: Response) => {
     const stats = multiAgentOrchestratorService.getStats();
+    sendSuccess(res, { stats, timestamp: new Date() });
+  });
 
-    res.json({
-      success: true,
-      stats,
-      timestamp: new Date()
-    });
-
-  } catch (error: any) {
-    logger.error('[MultiAgentController] Get stats failed', { error: error.message });
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-}
-
-/**
- * Get agent statuses
- */
-export async function getAgentStatuses(req: Request, res: Response) {
-  try {
+  /**
+   * Get agent statuses
+   */
+  getAgentStatuses = catchAsync(async (req: Request, res: Response) => {
     const statuses = multiAgentOrchestratorService.getAllAgentStatuses();
+    sendSuccess(res, { statuses, timestamp: new Date() });
+  });
 
-    res.json({
-      success: true,
-      statuses,
-      timestamp: new Date()
-    });
+  /**
+   * Handle user query
+   */
+  handleQuery = catchAsync(async (req: Request, res: Response) => {
+    const userId = req.user!.id;
+    const parsed = querySchema.safeParse(req.body);
+    if (!parsed.success) throw APIError.badRequest("Invalid query parameters");
 
-  } catch (error: any) {
-    logger.error('[MultiAgentController] Get agent statuses failed', { error: error.message });
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-}
-
-/**
- * Handle user query
- */
-export async function handleQuery(req: Request, res: Response) {
-  try {
-    const { query, userId, sessionId } = req.body;
-
-    if (!query || !userId) {
-      return res.status(400).json({
-        success: false,
-        error: 'Query and userId are required'
-      });
-    }
-
+    const { query, sessionId } = parsed.data;
     logger.info('[MultiAgentController] Query received', { query, userId });
 
     const result = await multiAgentOrchestratorService.handleUserQuery(
@@ -94,110 +54,42 @@ export async function handleQuery(req: Request, res: Response) {
       sessionId
     );
 
-    res.json({
-      success: true,
-      result,
-      timestamp: new Date()
-    });
+    sendSuccess(res, { result, timestamp: new Date() });
+  });
 
-  } catch (error: any) {
-    logger.error('[MultiAgentController] Query handling failed', { error: error.message });
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-}
-
-/**
- * Get pending alerts
- */
-export async function getPendingAlerts(req: Request, res: Response) {
-  try {
+  /**
+   * Get pending alerts
+   */
+  getPendingAlerts = catchAsync(async (req: Request, res: Response) => {
     const alerts = multiAgentOrchestratorService.getPendingAlerts();
+    sendSuccess(res, { alerts, count: alerts.length, timestamp: new Date() });
+  });
 
-    res.json({
-      success: true,
-      alerts,
-      count: alerts.length,
-      timestamp: new Date()
-    });
-
-  } catch (error: any) {
-    logger.error('[MultiAgentController] Get alerts failed', { error: error.message });
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-}
-
-/**
- * Get message history
- */
-export async function getMessageHistory(req: Request, res: Response) {
-  try {
+  /**
+   * Get message history
+   */
+  getMessageHistory = catchAsync(async (req: Request, res: Response) => {
     const limit = parseInt(req.query.limit as string) || 100;
     const messages = multiAgentOrchestratorService.getMessageHistory(limit);
+    sendSuccess(res, { messages, count: messages.length, timestamp: new Date() });
+  });
 
-    res.json({
-      success: true,
-      messages,
-      count: messages.length,
-      timestamp: new Date()
-    });
-
-  } catch (error: any) {
-    logger.error('[MultiAgentController] Get message history failed', { error: error.message });
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-}
-
-/**
- * Get shared state
- */
-export async function getSharedState(req: Request, res: Response) {
-  try {
+  /**
+   * Get shared state
+   */
+  getSharedState = catchAsync(async (req: Request, res: Response) => {
     const state = multiAgentOrchestratorService.getSharedState();
+    sendSuccess(res, { state, timestamp: new Date() });
+  });
 
-    res.json({
-      success: true,
-      state,
-      timestamp: new Date()
-    });
-
-  } catch (error: any) {
-    logger.error('[MultiAgentController] Get shared state failed', { error: error.message });
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-}
-
-/**
- * Shutdown system
- */
-export async function shutdownSystem(req: Request, res: Response) {
-  try {
+  /**
+   * Shutdown system
+   */
+  shutdownSystem = catchAsync(async (req: Request, res: Response) => {
     logger.info('[MultiAgentController] Shutdown request received');
-
     await multiAgentOrchestratorService.shutdown();
-
-    res.json({
-      success: true,
-      message: 'Multi-agent system shut down successfully',
-      timestamp: new Date()
-    });
-
-  } catch (error: any) {
-    logger.error('[MultiAgentController] Shutdown failed', { error: error.message });
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
+    sendSuccess(res, { timestamp: new Date() }, 'Multi-agent system shut down successfully');
+  });
 }
+
+export const multiAgentController = new MultiAgentController();
