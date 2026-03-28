@@ -34,21 +34,24 @@ export const checkNotionHealth = catchAsync(async (req: Request, res: Response) 
       });
     }
 
-    // Check token format
     const tokenPrefix = token.substring(0, 10);
-    const isValidFormat = token.startsWith('secret_') || token.startsWith('ntn_');
+    const provider = envVars.NOTION_PROVIDER || "mcp";
 
-    if (!isValidFormat) {
-      return res.status(200).json({
-        success: true,
-        data: {
-          connected: false,
-          reason: 'Invalid token format',
-          message: 'Notion token should start with "secret_" or "ntn_"',
-          tokenFormat: 'invalid',
-          tokenPrefix: tokenPrefix + '****'
-        }
-      });
+    // For REST, enforce known token prefixes; for MCP, validate by calling MCP.
+    if (provider === "rest") {
+      const isValidFormat = token.startsWith('secret_') || token.startsWith('ntn_');
+      if (!isValidFormat) {
+        return res.status(200).json({
+          success: true,
+          data: {
+            connected: false,
+            reason: 'Invalid token format',
+            message: 'Notion REST token should start with "secret_" or "ntn_"',
+            tokenFormat: 'invalid',
+            tokenPrefix: tokenPrefix + '****'
+          }
+        });
+      }
     }
 
     // Try a lightweight search to test access
@@ -60,7 +63,7 @@ export const checkNotionHealth = catchAsync(async (req: Request, res: Response) 
         data: {
           connected: true,
           message: 'Notion integration is working correctly',
-          tokenFormat: token.startsWith('ntn_') ? 'new' : 'legacy',
+          tokenFormat: token.startsWith('ntn_') ? 'new' : token.startsWith('secret_') ? 'legacy' : 'unknown',
           tokenPrefix: tokenPrefix + '****'
         }
       });
@@ -73,7 +76,7 @@ export const checkNotionHealth = catchAsync(async (req: Request, res: Response) 
             connected: false,
             reason: 'No page access',
             message: getNotionErrorMessage(searchError),
-            tokenFormat: token.startsWith('ntn_') ? 'new' : 'legacy',
+            tokenFormat: token.startsWith('ntn_') ? 'new' : token.startsWith('secret_') ? 'legacy' : 'unknown',
             tokenPrefix: tokenPrefix + '****',
             instructions: [
               '1. Open your Notion workspace',
@@ -118,23 +121,20 @@ export const getConnectionInstructions = catchAsync(async (req: Request, res: Re
       steps: [
         {
           step: 1,
-          title: 'Get your Notion Integration Token',
-          description: 'Go to https://www.notion.so/my-integrations and create a new integration or use an existing one.',
+          title: 'Choose your Notion connection method',
+          description: 'ORIN supports Notion MCP (recommended for hackathon) and Notion REST (fallback).',
           details: [
-            'Click "New integration"',
-            'Give it a name (e.g., "ORIN")',
-            'Select the workspace',
-            'Copy the "Internal Integration Token"'
+            'MCP: Use a Notion MCP access token (server-to-server) or connect via OAuth in the app.',
+            'REST: Use a Notion Integration token (secret_/ntn_) from https://www.notion.so/my-integrations.'
           ]
         },
         {
           step: 2,
           title: 'Add Token to ORIN',
-          description: 'Add the token to your backend .env file',
+          description: 'For server-side MCP, add the MCP token to your backend .env file. For OAuth, just connect in-app.',
           details: [
             'Open backend/.env',
             'Set NOTION_MCP_TOKEN=your_token_here',
-            'Token should start with "secret_" or "ntn_"',
             'Restart the backend server'
           ]
         },
