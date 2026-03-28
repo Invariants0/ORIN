@@ -8,22 +8,28 @@ datasource db {
 }
 
 model User {
-  id            String   @id @default(cuid())
-  email         String   @unique
-  name          String?
-  emailVerified Boolean?
-  image         String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id                     String    @id @default(cuid())
+  email                  String    @unique
+  name                   String?
+  emailVerified          Boolean?
+  image                  String?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
   // Custom ORIN fields
-  auth0Id       String?  @unique
-  avatar        String?
-  notionToken   String?
-  geminiKey     String?
+  auth0Id                String?   @unique
+  avatar                 String?
+  notionToken            String? // legacy (REST access token)
+  notionRestAccessToken  String?
+  notionRestRefreshToken String?
+  notionMcpAccessToken   String?
+  notionMcpRefreshToken  String?
+  notionMcpExpiresAt     DateTime?
+  geminiKey              String?
 
-  sessions     Session[]
-  chatSessions ChatSession[]
-  accounts     Account[]
+  sessions             Session[]
+  chatSessions         ChatSession[]
+  accounts             Account[]
+  notionMcpOAuthStates NotionMcpOAuthState[]
 
   @@map("users")
 }
@@ -350,4 +356,21 @@ model Policy {
   id          String @id @default(cuid())
   name        String
   description String
+}
+
+model NotionMcpOAuthState {
+  id           String   @id @default(cuid())
+  userId       String
+  state        String   @unique
+  codeVerifier String
+  clientId     String
+  clientSecret String?
+  redirectUri  String
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("notion_mcp_oauth_states")
 }
