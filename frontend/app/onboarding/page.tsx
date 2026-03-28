@@ -5,7 +5,7 @@ import { Card } from '@/components/core/brand/Card';
 import { Button } from '@/components/core/brand/Button';
 import { BrandInput } from '@/components/core/brand/Input';
 import { BrandBadge } from '@/components/core/brand/Badge';
-import { Check, ArrowRight, Key, Database, Zap } from 'lucide-react';
+import { Check, ArrowRight, Key, Database, Zap, Eye, EyeOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/hooks/useAuth';
 import { authClient } from '@/lib/auth';
@@ -19,6 +19,7 @@ export default function OnboardingPage() {
   const [apiKey, setApiKey] = useState('');
   const [isConnecting, setIsConnecting] = useState(false);
   const [isSavingKey, setIsSavingKey] = useState(false);
+  const [showKey, setShowKey] = useState(false);
 
   const steps = [
     { id: 1, title: 'API Setup', icon: Key },
@@ -64,12 +65,12 @@ export default function OnboardingPage() {
 
   const connectNotionRest = useCallback(() => {
     setIsConnecting(true);
-    window.location.href = `${API_BASE_URL}/notion/oauth/start?returnTo=/onboarding`;
+    window.location.href = `${API_BASE_URL}/notion/rest/start?returnTo=/onboarding`;
   }, []);
 
   const connectNotionMcp = useCallback(() => {
     setIsConnecting(true);
-    window.location.href = `${API_BASE_URL}/notion/mcp/oauth/start?returnTo=/onboarding`;
+    window.location.href = `${API_BASE_URL}/notion/mcp/start?returnTo=/onboarding`;
   }, []);
 
   return (
@@ -131,12 +132,22 @@ export default function OnboardingPage() {
                       <label className="text-xs font-black uppercase tracking-widest">
                         Gemini API Key
                       </label>
-                      <BrandInput
-                        type="password"
-                        placeholder="AIzaSy..."
-                        value={apiKey}
-                        onChange={(e) => setApiKey(e.target.value)}
-                      />
+                      <div className="relative">
+                        <BrandInput
+                          type={showKey ? 'text' : 'password'}
+                          placeholder="AIzaSy..."
+                          value={apiKey}
+                          onChange={(e) => setApiKey(e.target.value)}
+                          className="pr-12"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowKey(!showKey)}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-black/40 hover:text-black transition-colors"
+                        >
+                          {showKey ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                        </button>
+                      </div>
                     </div>
                     <p className="text-xs font-bold text-black/40">
                       Don&apos;t have a key?{' '}

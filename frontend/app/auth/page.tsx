@@ -29,35 +29,12 @@ function GoogleMark() {
 
 export default function AuthPage() {
   const { loginWithGoogle, loginWithGithub, googleOneTap, isAuthenticated, loading } = useAuth();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
 
   React.useEffect(() => {
     if (!isAuthenticated && !loading) {
       googleOneTap();
     }
   }, [isAuthenticated, loading, googleOneTap]);
-
-  const handleEmailLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    try {
-      const { error } = await authClient.signIn.email({
-        email,
-        password,
-      });
-      if (error) {
-        alert(error.message || 'Login failed');
-      } else {
-        window.location.href = '/onboarding';
-      }
-    } catch {
-      alert('An error occurred during login');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-[#ffe17c] flex items-center justify-center p-8 relative overflow-hidden">
@@ -95,36 +72,10 @@ export default function AuthPage() {
           </Button>
         </div>
 
-        <div className="relative my-10">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t-2 border-black/10" />
-          </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-white px-4 font-black text-black/30">Or use email</span>
-          </div>
-        </div>
-
-        <form
-          className="space-y-6"
-          onSubmit={handleEmailLogin}
-        >
-          <div className="space-y-2">
-            <label className="text-xs font-black uppercase tracking-widest">Email Address</label>
-            <BrandInput type="email" placeholder="name@company.com" required value={email} onChange={(e) => setEmail(e.target.value)} />
-          </div>
-          <div className="space-y-2">
-            <label className="text-xs font-black uppercase tracking-widest">Password</label>
-            <BrandInput type="password" placeholder="••••••••" required value={password} onChange={(e) => setPassword(e.target.value)} />
-          </div>
-          <Button type="submit" disabled={isLoading} className="w-full py-4 text-lg">
-            {isLoading ? 'Signing In...' : 'Sign In'}
-          </Button>
-        </form>
-
-        <p className="text-center mt-8 text-sm font-bold text-black/50">
-          Don&apos;t have an account?{' '}
+        <p className="text-center mt-12 text-sm font-bold text-black/50">
+          By signing in, you agree to our{' '}
           <Link href="#" className="text-black underline">
-            Sign up
+            Terms of Service
           </Link>
         </p>
       </Card>
