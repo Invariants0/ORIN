@@ -24,6 +24,14 @@ export const auth = betterAuth({
       notionToken: {
         type: "string",
         required: false,
+      },
+      notionRestAccessToken: {
+        type: "string",
+        required: false,
+      },
+      notionMcpAccessToken: {
+        type: "string",
+        required: false,
       }
     }
   },

@@ -32,6 +32,8 @@ const EnvConfigSchema = z.object({
   NOTION_MCP_URL: z.string().optional(),
   NOTION_MCP_TOKEN: z.string().optional(),
   NOTION_MCP_PARENT_PAGE_ID: z.string().optional(),
+  NOTION_MCP_OAUTH_REDIRECT_URI: z.string().optional(),
+  NOTION_MCP_OAUTH_SUCCESS_REDIRECT: z.string().optional(),
   NOTION_OAUTH_CLIENT_ID: z.string().optional(),
   NOTION_OAUTH_CLIENT_SECRET: z.string().optional(),
   NOTION_OAUTH_REDIRECT_URI: z.string().optional(),
@@ -77,19 +79,23 @@ try {
     missingRequired.push("NOTION_API_KEY");
   }
 
-  // Accept both legacy (secret_) and new (ntn_) token formats
-  if (notionProvider === "mcp" && parsed.NOTION_MCP_TOKEN) {
+  // Accept both legacy (secret_) and new (ntn_) token formats for server-level MCP usage
+  if (parsed.NOTION_MCP_TOKEN) {
     const token = parsed.NOTION_MCP_TOKEN;
     if (!token.startsWith("secret_") && !token.startsWith("ntn_")) {
       console.warn("⚠️  Warning: NOTION_MCP_TOKEN format may be invalid. Expected format: 'secret_*' or 'ntn_*'");
     }
   } else if (notionProvider === "mcp") {
-    missingRequired.push("NOTION_MCP_TOKEN");
+    console.warn("⚠️  Warning: NOTION_MCP_TOKEN not set. MCP calls will require user OAuth tokens.");
   }
 
   // NOTION_DATABASE_ID is optional - system will work without it
   if (!parsed.NOTION_DATABASE_ID) {
     console.warn("⚠️  Warning: NOTION_DATABASE_ID not set. Pages will be created at workspace level.");
+  }
+
+  if (!parsed.NOTION_MCP_OAUTH_REDIRECT_URI) {
+    console.warn("⚠️  Warning: NOTION_MCP_OAUTH_REDIRECT_URI not set. MCP OAuth flow will not work.");
   }
   
   // Final variables mapping
@@ -100,6 +106,7 @@ try {
     GEMINI_MODEL: parsed.GEMINI_MODEL || "gemini-2.5-flash",
     NOTION_PROVIDER: notionProvider,
     NOTION_MCP_URL: parsed.NOTION_MCP_URL || "https://mcp.notion.com/mcp",
+    NOTION_MCP_OAUTH_SUCCESS_REDIRECT: parsed.NOTION_MCP_OAUTH_SUCCESS_REDIRECT || parsed.FRONTEND_URL || "http://localhost:3000",
     MONITORING_ENABLED: parsed.MONITORING_ENABLED || "true",
     isReady: missingRequired.length === 0,
     missingRequired,
