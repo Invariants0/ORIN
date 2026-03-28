@@ -1,21 +1,27 @@
 import { Router } from 'express';
 import { workflowController } from '@/controllers/workflow.controller.js';
-import { asyncHandler } from '@/handlers/async.handler.js';
+import { authenticate } from "@/middlewares/auth.middleware.js";
+import { validate } from "@/middlewares/validate.middleware.js";
+import { createWorkflowSchema, getWorkflowSchema, pauseWorkflowSchema } from "@/schemas/workflow.schema.js";
 
 const router = Router();
 
+// Apply authentication to ALL workflow routes
+router.use(authenticate);
+
 // Workflow CRUD
-router.get('/', asyncHandler(workflowController.getWorkflows.bind(workflowController)));
-router.get('/statistics', asyncHandler(workflowController.getStatistics.bind(workflowController)));
-router.get('/metrics', asyncHandler(workflowController.getMetrics.bind(workflowController)));
-router.get('/alerts', asyncHandler(workflowController.getAlerts.bind(workflowController)));
-router.delete('/alerts', asyncHandler(workflowController.clearAlerts.bind(workflowController)));
-router.get('/:id', asyncHandler(workflowController.getWorkflowById.bind(workflowController)));
-router.post('/', asyncHandler(workflowController.createWorkflow.bind(workflowController)));
+router.get('/', workflowController.getWorkflows);
+router.get('/statistics', workflowController.getStatistics);
+router.get('/metrics', workflowController.getMetrics);
+router.get('/alerts', workflowController.getAlerts);
+router.delete('/alerts', workflowController.clearAlerts);
+
+router.get('/:id', validate(getWorkflowSchema), workflowController.getWorkflowById);
+router.post('/', validate(createWorkflowSchema), workflowController.createWorkflow);
 
 // Workflow control
-router.post('/:id/pause', asyncHandler(workflowController.pauseWorkflow.bind(workflowController)));
-router.post('/:id/resume', asyncHandler(workflowController.resumeWorkflow.bind(workflowController)));
-router.post('/:id/cancel', asyncHandler(workflowController.cancelWorkflow.bind(workflowController)));
+router.post('/:id/pause', validate(pauseWorkflowSchema), workflowController.pauseWorkflow);
+router.post('/:id/resume', workflowController.resumeWorkflow);
+router.post('/:id/cancel', workflowController.cancelWorkflow);
 
 export default router;

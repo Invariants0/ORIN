@@ -1,57 +1,59 @@
 // Multi-Agent Routes - Phase 20
 
 import { Router } from 'express';
-import * as multiAgentController from '@/controllers/multi-agent.controller.js';
+import { multiAgentController } from '@/controllers/multi-agent.controller.js';
+import { authenticate } from '@/middlewares/auth.middleware.js';
 
 const router = Router();
 
+// Apply authentication to all multi-agent routes
+router.use(authenticate);
+
 /**
- * POST /api/multi-agent/initialize
- * Initialize the multi-agent system
+ * @route   POST /api/multi-agent/initialize
+ * @desc    Initialize the multi-agent system
  */
 router.post('/initialize', multiAgentController.initializeSystem);
 
 /**
- * GET /api/multi-agent/stats
- * Get system statistics
+ * @route   GET /api/multi-agent/stats
+ * @desc    Get system statistics
  */
 router.get('/stats', multiAgentController.getSystemStats);
 
 /**
- * GET /api/multi-agent/agents/status
- * Get all agent statuses
+ * @route   GET /api/multi-agent/agents/status
+ * @desc    Get all agent statuses
  */
 router.get('/agents/status', multiAgentController.getAgentStatuses);
 
 /**
- * POST /api/multi-agent/query
- * Handle user query
- * Body: { query: string, userId: string, sessionId?: string }
+ * @route   POST /api/multi-agent/query
+ * @desc    Handle user query (requires { query: string, sessionId?: string })
  */
 router.post('/query', multiAgentController.handleQuery);
 
 /**
- * GET /api/multi-agent/alerts
- * Get pending alerts
+ * @route   GET /api/multi-agent/alerts
+ * @desc    Get pending alerts
  */
 router.get('/alerts', multiAgentController.getPendingAlerts);
 
 /**
- * GET /api/multi-agent/messages
- * Get message history
- * Query: ?limit=100
+ * @route   GET /api/multi-agent/messages
+ * @desc    Get message history
  */
 router.get('/messages', multiAgentController.getMessageHistory);
 
 /**
- * GET /api/multi-agent/state
- * Get shared state
+ * @route   GET /api/multi-agent/state
+ * @desc    Get shared state
  */
 router.get('/state', multiAgentController.getSharedState);
 
 /**
- * POST /api/multi-agent/shutdown
- * Shutdown the multi-agent system
+ * @route   POST /api/multi-agent/shutdown
+ * @desc    Shutdown the multi-agent system
  */
 router.post('/shutdown', multiAgentController.shutdownSystem);
 

@@ -1,9 +1,13 @@
 // Evolution Routes - Phase 21
 
 import { Router } from 'express';
-import * as evolutionController from '@/controllers/evolution.controller.js';
+import { evolutionController } from '@/controllers/evolution.controller.js';
+import { authenticate } from '@/middlewares/auth.middleware.js';
 
 const router = Router();
+
+// Apply authentication to all evolution routes
+router.use(authenticate);
 
 // Evolution Management
 router.post('/initialize', evolutionController.initializeEvolution);

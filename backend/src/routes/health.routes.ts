@@ -18,12 +18,18 @@ router.get("/", async (req, res) => {
     await db.$queryRaw`SELECT 1`;
     checks.database = "connected";
 
-    // 2. AI Service Check (Basic reachability if needed, but we rely on Gemini which is external)
+    // 2. AI Service Check
     checks.ai_service = envVars.GEMINI_API_KEY ? "configured" : "missing";
+
+    // 3. Notion Check (Config level)
+    checks.notion = {
+      rest: envVars.NOTION_OAUTH_CLIENT_ID ? "configured" : "missing",
+      mcp: envVars.NOTION_MCP_TOKEN ? "fixed-mcp-active" : (envVars.NOTION_OAUTH_CLIENT_ID ? "oauth-mcp-enabled" : "missing")
+    };
 
     res.status(200).json({
       status: "success",
-      message: "ORIN API is fully operational",
+      message: "ORIN API is operational",
       data: checks
     });
   } catch (err: any) {
