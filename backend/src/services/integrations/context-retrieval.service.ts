@@ -1,5 +1,6 @@
 import envVars from '@/config/envVars.js';
 import notionMcpService from '@/services/integrations/notion-mcp.service.js';
+import notionService from '@/services/integrations/notion.service.js';
 import logger from '@/config/logger.js';
 import db from '@/config/database.js';
 
@@ -150,18 +151,91 @@ class ContextRetrievalService {
    * Query Notion database with filters
    */
   private async queryNotionDatabase(input: ContextRetrievalInput): Promise<any[]> {
+    const token = await this.getUserNotionMcpToken(input.userId);
+
     try {
-      const token = await this.getUserNotionMcpToken(input.userId);
       if (!token && !envVars.NOTION_MCP_TOKEN) {
         logger.warn('[Context Retrieval] No Notion MCP token configured');
-        return [];
+        return await this.queryNotionRestFallback(input);
       }
+
       const results = await notionMcpService.search(input.query, token || envVars.NOTION_MCP_TOKEN);
-      return Array.isArray(results) ? results : [];
+      const normalizedResults = Array.isArray(results) ? results : [];
+
+      if (normalizedResults.length > 0) {
+        return normalizedResults;
+      }
+
+      logger.info('[Context Retrieval] MCP returned no results, trying REST fallback', {
+        query: input.query
+      });
+
+      return await this.queryNotionRestFallback(input);
 
     } catch (error: any) {
       logger.error('[Context Retrieval] Notion query failed', {
         error: error.message
+      });
+      return await this.queryNotionRestFallback(input);
+    }
+  }
+
+  private async queryNotionRestFallback(input: ContextRetrievalInput): Promise<any[]> {
+    try {
+      const token = await this.getUserNotionRestToken(input.userId);
+      if (!token && !envVars.NOTION_API_KEY) {
+        logger.warn('[Context Retrieval] No Notion REST token configured for fallback');
+        return [];
+      }
+
+      const effectiveToken = token || envVars.NOTION_API_KEY;
+      const normalizedQuery = input.query.toLowerCase();
+      const wantsRecentPage =
+        normalizedQuery.includes('recent page') ||
+        normalizedQuery.includes('latest page') ||
+        normalizedQuery.includes('summarize my page') ||
+        normalizedQuery.includes('summarize page');
+
+      const pages = await notionService.searchPages(wantsRecentPage ? '' : input.query, effectiveToken);
+
+      if (pages.length === 0) {
+        return [];
+      }
+
+      const rankedPages = [...pages].sort((a, b) => {
+        const aTime = new Date(a.lastEditedTime || 0).getTime();
+        const bTime = new Date(b.lastEditedTime || 0).getTime();
+        return bTime - aTime;
+      });
+
+      const candidatePages = wantsRecentPage ? rankedPages.slice(0, 1) : rankedPages.slice(0, input.limit || this.DEFAULT_LIMIT);
+      const hydratedResults: any[] = [];
+
+      for (const page of candidatePages) {
+        const blocks = await notionService.getPageContent(page.id, effectiveToken);
+        const content = this.extractTextFromBlocks(blocks);
+
+        hydratedResults.push({
+          id: page.id,
+          title: page.title,
+          content,
+          created_time: page.lastEditedTime,
+          url: page.url,
+          type: 'page',
+          tags: []
+        });
+      }
+
+      logger.info('[Context Retrieval] REST fallback fetched pages', {
+        count: hydratedResults.length,
+        query: input.query
+      });
+
+      return hydratedResults;
+    } catch (error: any) {
+      logger.error('[Context Retrieval] REST fallback failed', {
+        error: error.message,
+        query: input.query
       });
       return [];
     }
@@ -439,6 +513,28 @@ class ContextRetrievalService {
     }
   }
 
+  private extractTextFromBlocks(blocks: any[]): string {
+    const texts: string[] = [];
+
+    for (const block of blocks || []) {
+      const blockType = block?.type;
+      const richText = blockType ? block?.[blockType]?.rich_text : undefined;
+
+      if (Array.isArray(richText) && richText.length > 0) {
+        const text = richText
+          .map((item: any) => item?.plain_text || item?.text?.content || '')
+          .join('')
+          .trim();
+
+        if (text) {
+          texts.push(text);
+        }
+      }
+    }
+
+    return texts.join('\n');
+  }
+
   /**
    * Extract created date from Notion result
    */
@@ -507,6 +603,11 @@ ${'='.repeat(80)}`;
   private async getUserNotionMcpToken(userId: string): Promise<string | undefined> {
     const user = await db.user.findUnique({ where: { id: userId } });
     return user?.notionMcpAccessToken || envVars.NOTION_MCP_TOKEN;
+  }
+
+  private async getUserNotionRestToken(userId: string): Promise<string | undefined> {
+    const user = await db.user.findUnique({ where: { id: userId } });
+    return user?.notionRestAccessToken || user?.notionToken || envVars.NOTION_API_KEY;
   }
 }
 

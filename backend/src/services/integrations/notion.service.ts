@@ -69,7 +69,11 @@ export class NotionService {
   }
 
   async createPage(params: {
-    parent: { database_id: string } | { page_id: string } | { workspace: boolean };
+    parent:
+      | { database_id: string }
+      | { page_id: string }
+      | { workspace: boolean }
+      | { type: "workspace"; workspace: true };
     properties: Record<string, any>;
     children?: Array<Record<string, any>>;
     icon?: Record<string, any>;
@@ -176,13 +180,49 @@ export class NotionService {
         .filter((item: any) => isFullPage(item))
         .map((page: any) => ({
           id: page.id,
-          title: (page as any).title || "Untitled",
+          title: this.extractPageTitle(page),
           url: page.url,
           lastEditedTime: page.last_edited_time,
         }));
     } catch (error) {
       logger.error("[Notion] Failed to search pages", error);
       return [];
+    }
+  }
+
+  async findPageByExactTitle(title: string, token?: string) {
+    try {
+      const client = this.getClient(token);
+      const response = await (client.search as any)({
+        query: title,
+        sort: {
+          direction: "descending",
+          timestamp: "last_edited_time",
+        },
+        filter: {
+          value: "page",
+          property: "object",
+        },
+      });
+
+      const normalizedTitle = title.trim().toLowerCase();
+      const matchingPage = response.results
+        .filter((item: any) => isFullPage(item))
+        .find((page: any) => this.extractPageTitle(page).trim().toLowerCase() === normalizedTitle);
+
+      if (!matchingPage) {
+        return null;
+      }
+
+      return {
+        id: matchingPage.id,
+        title: this.extractPageTitle(matchingPage),
+        url: matchingPage.url,
+        lastEditedTime: matchingPage.last_edited_time,
+      };
+    } catch (error) {
+      logger.error("[Notion] Failed to find page by exact title", { title, error });
+      return null;
     }
   }
 
@@ -251,6 +291,19 @@ export class NotionService {
       logger.error("[Notion] Failed to create page with automatic parent", error);
       throw error;
     }
+  }
+
+  private extractPageTitle(page: any): string {
+    const titleProperty = Object.values(page?.properties || {}).find(
+      (property: any) => property?.type === "title"
+    ) as any;
+
+    const title = titleProperty?.title
+      ?.map((item: any) => item?.plain_text || item?.text?.content || "")
+      .join("")
+      .trim();
+
+    return title || "Untitled";
   }
 }
 

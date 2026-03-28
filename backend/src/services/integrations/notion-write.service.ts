@@ -8,6 +8,7 @@ export interface InboxEntryInput {
   type: 'idea' | 'task' | 'note' | 'research' | 'code' | 'document';
   tags: string[];
   content: string;
+  summary?: string;
   source?: string;
   userId: string;
 }
@@ -29,17 +30,20 @@ export interface RichContentBlock {
 class NotionWriteService {
   private readonly MAX_CONTENT_LENGTH = 10000;
   private readonly MAX_TITLE_LENGTH = 2000;
+  private readonly MAX_NOTION_BLOCKS_PER_APPEND = 100;
+  private readonly MAX_NOTION_TEXT_LENGTH = 2000;
+  private readonly ORIN_PAGE_TITLE = 'ORIN';
   private readonly DUPLICATE_CHECK_DAYS = 7;
   private readonly SIMILARITY_THRESHOLD = 0.8;
 
   /**
-   * Create an entry in Notion as a standalone page
+   * Append an entry to the persistent ORIN page
    */
   async createInboxEntry(input: InboxEntryInput): Promise<InboxEntryResult> {
     const startTime = Date.now();
 
     try {
-      logger.info('[Notion Write] Creating inbox entry as standalone page', {
+      logger.info('[Notion Write] Appending content to ORIN page', {
         title: input.title,
         type: input.type,
         userId: input.userId
@@ -48,70 +52,35 @@ class NotionWriteService {
       // Step 1: Validate input
       this.validateInput(input);
 
-      let pageId = '';
-      let pageUrl = '';
-
       const token = await this.getUserNotionRestToken(input.userId);
       if (!token && !envVars.NOTION_API_KEY) {
         throw new Error("No Notion REST token available. Connect Notion REST first.");
       }
 
-      // Step 2: Transform content into Notion blocks
-      const contentBlocks = this.transformContentToBlocks(input.content, input);
+      // Step 2: Resolve ORIN page
+      const orinPage = await this.getOrCreateORINPage(token || undefined);
+      const contentBlocks = this.transformContentToBlocks(input);
 
-      // Step 3: Resolve parent for page creation
-      // For MCP tokens, we need to find an existing page to use as parent
-      // since workspace-level private pages are not supported
-      let parentConfig: any = { type: 'workspace', workspace: true };
-      
-      try {
-        const existingPages = await notionService.searchPages("", token);
-        if (existingPages.length > 0) {
-          parentConfig = { page_id: existingPages[0].id };
-          logger.info('[Notion Write] Using existing page as parent', {
-            parentPageId: existingPages[0].id,
-            parentPageTitle: existingPages[0].title
-          });
-        }
-      } catch (searchError) {
-        // Fall back to workspace if search fails
-        logger.warn('[Notion Write] Could not search for parent pages, using workspace', { searchError });
+      // Step 3: Append blocks in Notion-safe batches
+      let appendedBlockCount = 0;
+      for (let index = 0; index < contentBlocks.length; index += this.MAX_NOTION_BLOCKS_PER_APPEND) {
+        const batch = contentBlocks.slice(index, index + this.MAX_NOTION_BLOCKS_PER_APPEND);
+        await notionService.appendBlocks(orinPage.id, batch, token || undefined);
+        appendedBlockCount += batch.length;
       }
-
-      // Create page with resolved parent
-      const page = await notionService.createPage({
-        parent: parentConfig,
-        properties: {
-          title: {
-            title: [{
-              text: {
-                content: input.title
-              }
-            }]
-          }
-        },
-        icon: {
-          type: 'emoji',
-          emoji: this.getIconForType(input.type)
-        } as any,
-        children: contentBlocks,
-        token: token || undefined
-      });
-
-      pageId = page.id;
-      pageUrl = (page as any).url || `https://notion.so/${page.id.replace(/-/g, '')}`;
 
       const processingTimeMs = Date.now() - startTime;
 
-      logger.info('[Notion Write] Inbox entry created successfully', {
-        pageId,
-        url: pageUrl,
+      logger.info('[Notion Write] Content appended to ORIN page successfully', {
+        pageId: orinPage.id,
+        url: orinPage.url,
+        appendedBlockCount,
         processingTimeMs
       });
 
       return {
-        pageId,
-        url: pageUrl || `https://notion.so/${pageId.replace(/-/g, '')}`,
+        pageId: orinPage.id,
+        url: orinPage.url,
         created: true,
         duplicate: false
       };
@@ -142,40 +111,134 @@ class NotionWriteService {
   }
 
   /**
-   * Transform content to Notion blocks with metadata
+   * Resolve the single ORIN page, creating it once if needed
    */
-  private transformContentToBlocks(content: string, input: InboxEntryInput): Array<Record<string, any>> {
-    const blocks: Array<Record<string, any>> = [];
+  private async getOrCreateORINPage(token?: string): Promise<{ id: string; url: string }> {
+    const existingPage = await notionService.findPageByExactTitle(this.ORIN_PAGE_TITLE, token);
 
-    // Add metadata callout at the top
-    blocks.push({
-      object: 'block',
-      type: 'callout',
-      callout: {
-        rich_text: [{
-          type: 'text',
-          text: {
-            content: `Type: ${input.type} | Tags: ${input.tags.join(', ') || 'none'} | Created: ${new Date().toLocaleString()}`
+    if (existingPage) {
+      logger.info('[Notion Write] Reusing existing ORIN page', {
+        pageId: existingPage.id,
+        title: existingPage.title
+      });
+
+      return {
+        id: existingPage.id,
+        url: existingPage.url || `https://notion.so/${existingPage.id.replace(/-/g, '')}`
+      };
+    }
+
+    logger.info('[Notion Write] ORIN page not found, creating at workspace root');
+    try {
+      const page = await notionService.createPage({
+        parent: { type: 'workspace', workspace: true },
+        properties: {
+          title: {
+            title: [{
+              text: {
+                content: this.ORIN_PAGE_TITLE
+              }
+            }]
           }
-        }],
+        },
         icon: {
           type: 'emoji',
-          emoji: this.getIconForType(input.type)
-        },
-        color: 'gray_background'
-      }
-    });
+          emoji: '🧠'
+        } as any,
+        token
+      });
 
-    // Add divider
+      return {
+        id: page.id,
+        url: (page as any).url || `https://notion.so/${page.id.replace(/-/g, '')}`
+      };
+    } catch (error: any) {
+      const isWorkspaceCreationBlocked =
+        error?.code === 'validation_error' &&
+        typeof error?.message === 'string' &&
+        error.message.includes('workspace-level private pages is not supported');
+
+      if (!isWorkspaceCreationBlocked) {
+        throw error;
+      }
+
+      logger.warn('[Notion Write] Workspace root creation blocked by Notion integration type, falling back to first accessible parent', {
+        error: error.message
+      });
+
+      const existingPages = await notionService.searchPages('', token);
+      if (existingPages.length === 0) {
+        throw new Error(
+          'Unable to create the ORIN page because this Notion integration cannot create workspace-root pages and no shared parent page is accessible.'
+        );
+      }
+
+      const fallbackParent = existingPages[0];
+      const page = await notionService.createPage({
+        parent: { page_id: fallbackParent.id },
+        properties: {
+          title: {
+            title: [{
+              text: {
+                content: this.ORIN_PAGE_TITLE
+              }
+            }]
+          }
+        },
+        icon: {
+          type: 'emoji',
+          emoji: '🧠'
+        } as any,
+        token
+      });
+
+      logger.info('[Notion Write] Created ORIN page under fallback parent', {
+        pageId: page.id,
+        parentPageId: fallbackParent.id,
+        parentPageTitle: fallbackParent.title
+      });
+
+      return {
+        id: page.id,
+        url: (page as any).url || `https://notion.so/${page.id.replace(/-/g, '')}`
+      };
+    }
+  }
+
+  /**
+   * Transform content to ORIN append blocks with metadata
+   */
+  private transformContentToBlocks(input: InboxEntryInput): Array<Record<string, any>> {
+    const blocks: Array<Record<string, any>> = [];
+    const tags = input.tags.length > 0 ? input.tags : [];
+
+    blocks.push(this.createTextBlock('heading_2', input.title));
+    blocks.push(this.createTextBlock('paragraph', `Type: ${input.type}`));
+    blocks.push(this.createTextBlock('paragraph', `Stored: ${new Date().toLocaleString()}`));
+
+    if (input.source) {
+      blocks.push(this.createTextBlock('paragraph', `Source: ${input.source}`));
+    }
+
+    if (tags.length > 0) {
+      blocks.push(this.createTextBlock('paragraph', 'Tags:'));
+      blocks.push(
+        ...tags.map((tag) => this.createTextBlock('bulleted_list_item', tag))
+      );
+    }
+
+    if (input.summary) {
+      blocks.push(this.createTextBlock('paragraph', 'Summary:'));
+      blocks.push(...this.createParagraphBlocks(input.summary));
+    }
+
+    blocks.push(this.createTextBlock('paragraph', 'Content:'));
+    blocks.push(...this.parseContentToBlocks(input.content));
     blocks.push({
       object: 'block',
       type: 'divider',
       divider: {}
     });
-
-    // Parse and add content blocks
-    const contentBlocks = this.parseContentToBlocks(content);
-    blocks.push(...contentBlocks);
 
     return blocks;
   }
@@ -197,111 +260,94 @@ class NotionWriteService {
 
       // Detect heading 1 (# Heading)
       if (line.match(/^#\s+(.+)$/)) {
-        blocks.push({
-          object: 'block',
-          type: 'heading_1',
-          heading_1: {
-            rich_text: [{
-              type: 'text',
-              text: { content: line.replace(/^#\s+/, '').trim().substring(0, 2000) }
-            }]
-          }
-        });
+        blocks.push(this.createTextBlock('heading_1', line.replace(/^#\s+/, '').trim()));
         continue;
       }
 
       // Detect heading 2 (## Heading)
       if (line.match(/^##\s+(.+)$/)) {
-        blocks.push({
-          object: 'block',
-          type: 'heading_2',
-          heading_2: {
-            rich_text: [{
-              type: 'text',
-              text: { content: line.replace(/^##\s+/, '').trim().substring(0, 2000) }
-            }]
-          }
-        });
+        blocks.push(this.createTextBlock('heading_2', line.replace(/^##\s+/, '').trim()));
         continue;
       }
 
       // Detect heading 3 (### Heading)
       if (line.match(/^###\s+(.+)$/)) {
-        blocks.push({
-          object: 'block',
-          type: 'heading_3',
-          heading_3: {
-            rich_text: [{
-              type: 'text',
-              text: { content: line.replace(/^###\s+/, '').trim().substring(0, 2000) }
-            }]
-          }
-        });
+        blocks.push(this.createTextBlock('heading_3', line.replace(/^###\s+/, '').trim()));
         continue;
       }
 
       // Detect bulleted list (- item or * item)
       if (line.match(/^[\-\*]\s+(.+)$/)) {
-        blocks.push({
-          object: 'block',
-          type: 'bulleted_list_item',
-          bulleted_list_item: {
-            rich_text: [{
-              type: 'text',
-              text: { content: line.replace(/^[\-\*]\s+/, '').trim().substring(0, 2000) }
-            }]
-          }
-        });
+        blocks.push(this.createTextBlock('bulleted_list_item', line.replace(/^[\-\*]\s+/, '').trim()));
         continue;
       }
 
       // Detect numbered list (1. item)
       if (line.match(/^\d+\.\s+(.+)$/)) {
-        blocks.push({
-          object: 'block',
-          type: 'numbered_list_item',
-          numbered_list_item: {
-            rich_text: [{
-              type: 'text',
-              text: { content: line.replace(/^\d+\.\s+/, '').trim().substring(0, 2000) }
-            }]
-          }
-        });
+        blocks.push(this.createTextBlock('numbered_list_item', line.replace(/^\d+\.\s+/, '').trim()));
         continue;
       }
 
       // Default: paragraph
-      blocks.push({
-        object: 'block',
-        type: 'paragraph',
-        paragraph: {
-          rich_text: [{
-            type: 'text',
-            text: {
-              content: line.trim().substring(0, 2000)
-            }
-          }]
-        }
-      });
+      blocks.push(...this.createParagraphBlocks(line.trim()));
     }
 
     // If no blocks were created, add content as single paragraph
     if (blocks.length === 0) {
-      blocks.push({
-        object: 'block',
-        type: 'paragraph',
-        paragraph: {
-          rich_text: [{
-            type: 'text',
-            text: {
-              content: content.substring(0, 2000)
-            }
-          }]
-        }
-      });
+      blocks.push(...this.createParagraphBlocks(content));
     }
 
     return blocks;
+  }
+
+  private createParagraphBlocks(content: string): Array<Record<string, any>> {
+    return this.chunkText(content).map((chunk) => this.createTextBlock('paragraph', chunk));
+  }
+
+  private createTextBlock(
+    type: 'paragraph' | 'heading_1' | 'heading_2' | 'heading_3' | 'bulleted_list_item' | 'numbered_list_item',
+    content: string
+  ): Record<string, any> {
+    const normalizedContent = content.trim().substring(0, this.MAX_NOTION_TEXT_LENGTH) || ' ';
+
+    return {
+      object: 'block',
+      type,
+      [type]: {
+        rich_text: [{
+          type: 'text',
+          text: {
+            content: normalizedContent
+          }
+        }]
+      }
+    };
+  }
+
+  private chunkText(content: string): string[] {
+    const normalized = content.trim();
+    if (!normalized) {
+      return [' '];
+    }
+
+    const chunks: string[] = [];
+    let remaining = normalized;
+
+    while (remaining.length > this.MAX_NOTION_TEXT_LENGTH) {
+      let splitIndex = remaining.lastIndexOf(' ', this.MAX_NOTION_TEXT_LENGTH);
+      if (splitIndex <= 0) {
+        splitIndex = this.MAX_NOTION_TEXT_LENGTH;
+      }
+
+      chunks.push(remaining.slice(0, splitIndex).trim());
+      remaining = remaining.slice(splitIndex).trim();
+    }
+
+    if (remaining.length > 0) {
+      chunks.push(remaining);
+    }
+
+    return chunks;
   }
 
   private renderMarkdownContent(input: InboxEntryInput): string {
