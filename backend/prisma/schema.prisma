@@ -16,15 +16,12 @@ model User {
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
   // Custom ORIN fields
-  auth0Id                String?   @unique
-  avatar                 String?
-  notionToken            String? // legacy (REST access token)
+  geminiKey              String?
   notionRestAccessToken  String?
   notionRestRefreshToken String?
   notionMcpAccessToken   String?
   notionMcpRefreshToken  String?
   notionMcpExpiresAt     DateTime?
-  geminiKey              String?
 
   sessions             Session[]
   chatSessions         ChatSession[]
