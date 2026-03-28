@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { authClient } from "@/lib/auth";
 import type { User, Session } from "better-auth/types";
 import { useRouter, usePathname } from "next/navigation";
@@ -26,6 +26,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const { setUser: setOrinUser } = useOrinStore();
+  const oneTapInFlight = useRef(false);
 
   useEffect(() => {
     async function fetchSession() {
@@ -88,12 +89,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const googleOneTap = async () => {
     try {
+      if (oneTapInFlight.current) return;
+      oneTapInFlight.current = true;
       // @ts-ignore - better-auth types might not catch social.oneTap depending on plugin setup
       await authClient.oneTap({
         callbackURL: `${process.env.NEXT_PUBLIC_FRONTEND_URL || "http://localhost:3000"}/onboarding`
       });
     } catch (error) {
       console.warn("One Tap sign-in failed or was dismissed", error);
+    } finally {
+      oneTapInFlight.current = false;
     }
   };
 
