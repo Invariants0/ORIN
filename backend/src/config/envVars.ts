@@ -77,12 +77,19 @@ try {
     missingRequired.push("NOTION_API_KEY");
   }
 
-  if (notionProvider === "mcp" && !parsed.NOTION_MCP_TOKEN) {
+  // Accept both legacy (secret_) and new (ntn_) token formats
+  if (notionProvider === "mcp" && parsed.NOTION_MCP_TOKEN) {
+    const token = parsed.NOTION_MCP_TOKEN;
+    if (!token.startsWith("secret_") && !token.startsWith("ntn_")) {
+      console.warn("⚠️  Warning: NOTION_MCP_TOKEN format may be invalid. Expected format: 'secret_*' or 'ntn_*'");
+    }
+  } else if (notionProvider === "mcp") {
     missingRequired.push("NOTION_MCP_TOKEN");
   }
 
+  // NOTION_DATABASE_ID is optional - system will work without it
   if (!parsed.NOTION_DATABASE_ID) {
-    missingRequired.push("NOTION_DATABASE_ID");
+    console.warn("⚠️  Warning: NOTION_DATABASE_ID not set. Pages will be created at workspace level.");
   }
   
   // Final variables mapping
