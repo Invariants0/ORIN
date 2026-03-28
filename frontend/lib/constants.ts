@@ -10,6 +10,7 @@ export const FRONTEND_URL = process.env.NEXT_PUBLIC_FRONTEND_URL || "http://loca
 export const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 
 // Derived API Endpoints
+export const API_BASE_URL = IS_PROD ? `${BACKEND_URL}/api` : `/api`;
 export const API_VERSION = "/api/v1";
 export const API_ROOT = IS_PROD ? `${BACKEND_URL}${API_VERSION}` : `/api/v1`;
 
