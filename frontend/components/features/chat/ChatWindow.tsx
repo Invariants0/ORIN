@@ -9,7 +9,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 const SUGGESTIONS: Record<string, string[]> = {
   explore: [
     'What did I receive today?',
-    'Summarize my recent research',
+    'Summarize my page',
     "What's in my Notion inbox?",
     'Find research on AI agents',
   ],
