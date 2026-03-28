@@ -4,9 +4,9 @@ import { APIError } from "@/utils/errors.js";
 import envVars from "@/config/envVars.js";
 import intentService from "@/services/ai/intent.service.js";
 import geminiService from "@/services/ai/gemini.service.js";
-import notionWriteService from "@/services/integrations/notion/notion-write.service.js";
-import contextRetrievalService from "@/services/integrations/notion/context.service.js";
-import notionService from "@/services/integrations/notion/notion.service.js";
+import notionWriteService from "@/services/integrations/notion-write.service.js";
+import contextRetrievalService from "@/services/integrations/context-retrieval.service.js";
+import notionService from "@/services/integrations/notion.service.js";
 
 export const storeContent = catchAsync(async (req: Request, res: Response) => {
   const { input } = req.body as { input?: string };
