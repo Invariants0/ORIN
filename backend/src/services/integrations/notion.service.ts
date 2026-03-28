@@ -11,14 +11,26 @@ export class NotionService {
     });
   }
 
+  private getClient(token?: string): Client {
+    if (token) {
+      return new Client({ auth: token });
+    }
+    if (!envVars.NOTION_API_KEY) {
+      throw new Error("NOTION_API_KEY is not configured");
+    }
+    return this.client;
+  }
+
   async createPage(params: {
     parent: { database_id: string } | { page_id: string } | { workspace: boolean };
     properties: Record<string, any>;
     children?: Array<Record<string, any>>;
     icon?: Record<string, any>;
+    token?: string;
   }) {
     try {
-      const page = await this.client.pages.create({
+      const client = this.getClient(params.token);
+      const page = await client.pages.create({
         parent: params.parent as any,
         properties: params.properties as any,
         children: params.children as any,
@@ -33,32 +45,36 @@ export class NotionService {
     }
   }
 
-  async queryDatabase(databaseId: string, filter?: Record<string, any>) {
+  async queryDatabase(databaseId: string, filter?: Record<string, any>, token?: string) {
     try {
-      const response = await (this.client.databases as any).query({
+      const client = this.getClient(token);
+      const response = await (client.databases as any).query({
         database_id: databaseId,
         filter,
       });
 
-      return response.results.map((page: any) => {
-        if (isFullPage(page)) {
-          return {
-            id: page.id,
-            properties: page.properties,
-            url: page.url,
-          };
-        }
-        return null;
-      }).filter(Boolean);
+      return response.results
+        .map((page: any) => {
+          if (isFullPage(page)) {
+            return {
+              id: page.id,
+              properties: page.properties,
+              url: page.url,
+            };
+          }
+          return null;
+        })
+        .filter(Boolean);
     } catch (error) {
       logger.error("[Notion] Failed to query database", error);
       throw error;
     }
   }
 
-  async getPageContent(pageId: string) {
+  async getPageContent(pageId: string, token?: string) {
     try {
-      const blocks = await this.client.blocks.children.list({
+      const client = this.getClient(token);
+      const blocks = await client.blocks.children.list({
         block_id: pageId,
       });
 
@@ -69,9 +85,10 @@ export class NotionService {
     }
   }
 
-  async appendBlocks(pageId: string, children: Array<Record<string, any>>) {
+  async appendBlocks(pageId: string, children: Array<Record<string, any>>, token?: string) {
     try {
-      const response = await this.client.blocks.children.append({
+      const client = this.getClient(token);
+      const response = await client.blocks.children.append({
         block_id: pageId,
         children: children as any,
       });
@@ -82,6 +99,11 @@ export class NotionService {
       logger.error("[Notion] Failed to append blocks", error);
       throw error;
     }
+  }
+
+  async getCurrentUser(token?: string) {
+    const client = this.getClient(token);
+    return client.users.me({});
   }
 }
 

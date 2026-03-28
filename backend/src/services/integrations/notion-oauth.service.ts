@@ -5,6 +5,7 @@ import { APIError } from "@/utils/errors.js";
 
 type TokenResponse = {
   access_token: string;
+  refresh_token?: string;
   bot_id?: string;
   workspace_id?: string;
   workspace_name?: string;
@@ -68,7 +69,9 @@ class NotionOauthService {
     await db.user.update({
       where: { id: userId },
       data: {
-        notionToken: tokens.access_token
+        notionToken: tokens.access_token, // legacy field
+        notionRestAccessToken: tokens.access_token,
+        notionRestRefreshToken: tokens.refresh_token || null
       }
     });
   }
@@ -77,14 +80,16 @@ class NotionOauthService {
     await db.user.update({
       where: { id: userId },
       data: {
-        notionToken: null
+        notionToken: null,
+        notionRestAccessToken: null,
+        notionRestRefreshToken: null
       }
     });
   }
 
   async getTokenForUser(userId: string): Promise<string | null> {
     const user = await db.user.findUnique({ where: { id: userId } });
-    return user?.notionToken || null;
+    return user?.notionRestAccessToken || user?.notionToken || null;
   }
 }
 

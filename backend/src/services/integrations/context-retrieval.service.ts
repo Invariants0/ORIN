@@ -1,5 +1,4 @@
 import envVars from '@/config/envVars.js';
-import notionService from '@/services/integrations/notion.service.js';
 import notionMcpService from '@/services/integrations/notion-mcp.service.js';
 import logger from '@/config/logger.js';
 import db from '@/config/database.js';
@@ -152,39 +151,13 @@ class ContextRetrievalService {
    */
   private async queryNotionDatabase(input: ContextRetrievalInput): Promise<any[]> {
     try {
-      if (envVars.NOTION_PROVIDER === 'mcp') {
-        const token = await this.getUserNotionToken(input.userId);
-        const results = await notionMcpService.search(input.query, token);
-        return Array.isArray(results) ? results : [];
-      }
-
-      const databaseId = envVars.NOTION_DATABASE_ID || '';
-      if (!databaseId) {
-        logger.warn('[Context Retrieval] No Notion database ID configured');
+      const token = await this.getUserNotionMcpToken(input.userId);
+      if (!token && !envVars.NOTION_MCP_TOKEN) {
+        logger.warn('[Context Retrieval] No Notion MCP token configured');
         return [];
       }
-
-      // Calculate date range
-      const dateRange = input.dateRange || this.DEFAULT_DATE_RANGE;
-      const cutoffDate = new Date();
-      cutoffDate.setDate(cutoffDate.getDate() - dateRange);
-
-      // Query with date filter
-      const filter: any = {
-        property: 'Created At',
-        date: {
-          on_or_after: cutoffDate.toISOString()
-        }
-      };
-
-      const results = await notionService.queryDatabase(databaseId, filter);
-
-      logger.debug('[Context Retrieval] Notion query completed', {
-        resultsCount: results.length,
-        dateRange: `${dateRange} days`
-      });
-
-      return results;
+      const results = await notionMcpService.search(input.query, token || envVars.NOTION_MCP_TOKEN);
+      return Array.isArray(results) ? results : [];
 
     } catch (error: any) {
       logger.error('[Context Retrieval] Notion query failed', {
@@ -531,9 +504,9 @@ ${'='.repeat(80)}`;
     }).join('\n\n');
   }
 
-  private async getUserNotionToken(userId: string): Promise<string | undefined> {
+  private async getUserNotionMcpToken(userId: string): Promise<string | undefined> {
     const user = await db.user.findUnique({ where: { id: userId } });
-    return user?.notionToken || envVars.NOTION_MCP_TOKEN;
+    return user?.notionMcpAccessToken || envVars.NOTION_MCP_TOKEN;
   }
 }
 
