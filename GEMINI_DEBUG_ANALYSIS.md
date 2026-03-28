@@ -461,7 +461,7 @@ for (let attempt = 0; attempt <= maxRetries; attempt++) {
 
 ### Environment Variables:
 ```
-GEMINI_API_KEY=AIzaSyCsC7pbikhtv6-gqZFnvUxw7-GjlJ8E_sg ✅
+GEMINI_API_KEY=AIza.................................... ✅
 GEMINI_MODEL=gemini-2.5-flash ✅
 ```
 
