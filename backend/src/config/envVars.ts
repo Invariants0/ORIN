@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { NOTION_CONFIG, AI_CONFIG, SYSTEM_CONFIG, AUTH_CONFIG } from "./constants.js";
+import { NOTION_CONFIG, AI_CONFIG, SYSTEM_CONFIG } from "./constants.js";
 
 const EnvConfigSchema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
@@ -27,22 +27,17 @@ const EnvConfigSchema = z.object({
   GEMINI_MODEL: z.string().optional(),
   
   // Notion Integration (required for full functionality)
+  NOTION_OAUTH_CLIENT_ID: z.string().optional(),
+  NOTION_OAUTH_CLIENT_SECRET: z.string().optional(),
   NOTION_API_KEY: z.string().optional(),
   NOTION_DATABASE_ID: z.string().optional(),
-  NOTION_PROVIDER: z.enum(["mcp", "rest"]).optional(),
   NOTION_MCP_URL: z.string().optional(),
   NOTION_MCP_TOKEN: z.string().optional(),
   NOTION_MCP_PARENT_PAGE_ID: z.string().optional(),
   
   // Manual OAuth (optional - overrides derived values)
   NOTION_MCP_OAUTH_REDIRECT_URI: z.string().optional(),
-  NOTION_OAUTH_CLIENT_ID: z.string().optional(),
-  NOTION_OAUTH_CLIENT_SECRET: z.string().optional(),
   NOTION_OAUTH_REDIRECT_URI: z.string().optional(),
-  
-  // Security
-  SESSION_SECRET: z.string().optional(),
-  JWT_SECRET: z.string().optional(),
   
   // CORS
   FRONTEND_URL: z.string().url().default("http://localhost:3000"),
@@ -67,7 +62,8 @@ let envVars: EnvConfig;
 try {
   const parsed = EnvConfigSchema.parse(process.env);
   const betterAuthUrl = parsed.BETTER_AUTH_URL || "http://localhost:8000/api/auth";
-  const backendBaseUrl = betterAuthUrl.replace("/api/auth", "");
+  // Robust base URL derivation (strips everything after /api if present)
+  const backendBaseUrl = betterAuthUrl.split("/api")[0];
   
   // Derived Callback URLs
   const googleCallback = parsed.GOOGLE_CALLBACK_URL || `${betterAuthUrl}/callback/google`;
@@ -79,12 +75,8 @@ try {
   const missingRequired: string[] = [];
   if (!parsed.BETTER_AUTH_SECRET) missingRequired.push("BETTER_AUTH_SECRET");
   if (!parsed.GEMINI_API_KEY) missingRequired.push("GEMINI_API_KEY");
+  if (!parsed.BETTER_AUTH_URL && parsed.NODE_ENV === "production") missingRequired.push("BETTER_AUTH_URL");
   
-  const notionProvider = parsed.NOTION_PROVIDER || "mcp";
-  if (notionProvider === "rest" && !parsed.NOTION_API_KEY) {
-    missingRequired.push("NOTION_API_KEY");
-  }
-
   // Final variables mapping
   const finalVars = {
     ...parsed,
@@ -93,7 +85,6 @@ try {
     GOOGLE_CALLBACK_URL: googleCallback,
     GITHUB_CALLBACK_URL: githubCallback,
     GEMINI_MODEL: parsed.GEMINI_MODEL || AI_CONFIG.GEMINI_MODEL_DEFAULT,
-    NOTION_PROVIDER: notionProvider,
     NOTION_MCP_URL: parsed.NOTION_MCP_URL || NOTION_CONFIG.MCP_URL_DEFAULT,
     NOTION_MCP_OAUTH_REDIRECT_URI: mcpCallback,
     NOTION_MCP_OAUTH_SUCCESS_REDIRECT: parsed.FRONTEND_URL || "http://localhost:3000",
