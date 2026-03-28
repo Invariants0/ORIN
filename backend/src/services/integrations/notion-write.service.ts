@@ -59,9 +59,28 @@ class NotionWriteService {
       // Step 2: Transform content into Notion blocks
       const contentBlocks = this.transformContentToBlocks(input.content, input);
 
-      // Step 3: Create page in Notion workspace (no parent = workspace level)
+      // Step 3: Resolve parent for page creation
+      // For MCP tokens, we need to find an existing page to use as parent
+      // since workspace-level private pages are not supported
+      let parentConfig: any = { type: 'workspace', workspace: true };
+      
+      try {
+        const existingPages = await notionService.searchPages("", token);
+        if (existingPages.length > 0) {
+          parentConfig = { page_id: existingPages[0].id };
+          logger.info('[Notion Write] Using existing page as parent', {
+            parentPageId: existingPages[0].id,
+            parentPageTitle: existingPages[0].title
+          });
+        }
+      } catch (searchError) {
+        // Fall back to workspace if search fails
+        logger.warn('[Notion Write] Could not search for parent pages, using workspace', { searchError });
+      }
+
+      // Create page with resolved parent
       const page = await notionService.createPage({
-        parent: { type: 'workspace', workspace: true } as any,
+        parent: parentConfig,
         properties: {
           title: {
             title: [{

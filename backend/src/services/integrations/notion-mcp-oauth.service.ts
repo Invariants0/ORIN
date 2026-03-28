@@ -260,6 +260,90 @@ class NotionMcpOauthService {
     await db.notionMcpOAuthState.delete({ where: { state } });
   }
 
+  /**
+   * Refresh an access token using the refresh token
+   * Called when the access token has expired
+   * 
+   * NOTE: If discovery or refresh fails, returns null and does NOT clear tokens
+   * The original token can still be attempted
+   */
+  async refreshAccessToken(userId: string): Promise<TokenResponse | null> {
+    const user = await db.user.findUnique({
+      where: { id: userId },
+      select: {
+        notionMcpAccessToken: true,
+        notionMcpRefreshToken: true,
+        notionMcpExpiresAt: true
+      }
+    });
+
+    if (!user?.notionMcpRefreshToken) {
+      logger.warn("[Notion MCP OAuth] No refresh token available for user", { userId });
+      return null;
+    }
+
+    // Check if token is not expired yet
+    if (user.notionMcpExpiresAt && user.notionMcpExpiresAt.getTime() > Date.now()) {
+      logger.debug("[Notion MCP OAuth] Token still valid", { userId });
+      return null;
+    }
+
+    try {
+      logger.info("[Notion MCP OAuth] Attempting to refresh access token", { userId });
+
+      // Try to discover OAuth metadata to get token endpoint
+      let metadata = null;
+      try {
+        metadata = await this.discoverOAuthMetadata(envVars.NOTION_MCP_URL || "https://mcp.notion.com/mcp");
+      } catch (discoveryError) {
+        logger.warn("[Notion MCP OAuth] Metadata discovery failed, cannot refresh token", { 
+          userId, 
+          error: discoveryError 
+        });
+        // Don't throw - let the caller use the original token
+        return null;
+      }
+
+      const body = new URLSearchParams({
+        grant_type: "refresh_token",
+        refresh_token: user.notionMcpRefreshToken
+      });
+
+      const response = await fetch(metadata.token_endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Accept: "application/json"
+        },
+        body
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        logger.warn("[Notion MCP OAuth] Token refresh failed", {
+          userId,
+          status: response.status,
+          text
+        });
+        
+        // Don't clear tokens - let the caller use the original token
+        // The original token might still be valid for a bit
+        return null;
+      }
+
+      const tokens = (await response.json()) as TokenResponse;
+      logger.info("[Notion MCP OAuth] Token refreshed successfully", { userId });
+
+      // Store refreshed tokens
+      await this.storeTokensForUser(userId, tokens);
+      return tokens;
+    } catch (error) {
+      logger.error("[Notion MCP OAuth] Token refresh error", { userId, error });
+      // Return null to indicate failed refresh, don't clear tokens
+      return null;
+    }
+  }
+
   private base64UrlEncode(buffer: Buffer): string {
     return buffer
       .toString("base64")

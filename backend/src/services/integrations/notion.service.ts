@@ -1,6 +1,8 @@
 import { Client, isFullPage } from "@notionhq/client";
 import envVars from "@/config/envVars.js";
 import logger from "@/config/logger.js";
+import notionMcpOauthService from "@/services/integrations/notion-mcp-oauth.service.js";
+import db from "@/config/database.js";
 
 export class NotionService {
   private client: Client;
@@ -19,6 +21,51 @@ export class NotionService {
       throw new Error("NOTION_API_KEY is not configured");
     }
     return this.client;
+  }
+
+  /**
+   * Get a valid access token, refreshing if necessary
+   * For MCP tokens, automatically attempts refresh if token is expired
+   * Falls back to original token if refresh fails
+   */
+  async getValidAccessToken(userId: string, token: string): Promise<string> {
+    if (!token) {
+      throw new Error("No access token provided");
+    }
+
+    try {
+      const user = await db.user.findUnique({
+        where: { id: userId },
+        select: {
+          notionMcpExpiresAt: true,
+          notionMcpAccessToken: true,
+          notionMcpRefreshToken: true
+        }
+      });
+
+      // Only attempt refresh if token is actually expired
+      if (
+        user?.notionMcpExpiresAt &&
+        user.notionMcpExpiresAt.getTime() < Date.now() &&
+        user.notionMcpRefreshToken
+      ) {
+        logger.info("[Notion] MCP token expired, attempting refresh", { userId });
+        const refreshedTokens = await notionMcpOauthService.refreshAccessToken(userId);
+        
+        if (refreshedTokens?.access_token) {
+          logger.info("[Notion] MCP token refreshed successfully", { userId });
+          return refreshedTokens.access_token;
+        } else {
+          logger.warn("[Notion] Token refresh failed, falling back to original token", { userId });
+          // Fall through and use original token
+        }
+      }
+    } catch (error) {
+      logger.warn("[Notion] Error checking token expiry", { userId, error });
+      // Fall through and use original token
+    }
+
+    return token;
   }
 
   async createPage(params: {
@@ -104,6 +151,106 @@ export class NotionService {
   async getCurrentUser(token?: string) {
     const client = this.getClient(token);
     return client.users.me({});
+  }
+
+  /**
+   * Search for pages in the user's Notion workspace
+   * Used to find a parent page for creating new pages (required for MCP tokens)
+   */
+  async searchPages(query: string = "", token?: string) {
+    try {
+      const client = this.getClient(token);
+      const response = await (client.search as any)({
+        query: query || "",
+        sort: {
+          direction: "ascending",
+          timestamp: "last_edited_time",
+        },
+        filter: {
+          value: "page",
+          property: "object",
+        },
+      });
+
+      return response.results
+        .filter((item: any) => isFullPage(item))
+        .map((page: any) => ({
+          id: page.id,
+          title: (page as any).title || "Untitled",
+          url: page.url,
+          lastEditedTime: page.last_edited_time,
+        }));
+    } catch (error) {
+      logger.error("[Notion] Failed to search pages", error);
+      return [];
+    }
+  }
+
+  /**
+   * Create a page with automatic parent resolution
+   * For MCP tokens: searches for a parent page to use
+   * For regular tokens: uses the provided parent or workspace
+   */
+  async createPageWithAutomaticParent(
+    title: string,
+    content?: string,
+    token?: string,
+    userId?: string
+  ) {
+    try {
+      // Get valid access token (refresh if needed)
+      let validToken = token;
+      if (userId && token) {
+        validToken = await this.getValidAccessToken(userId, token);
+      }
+
+      let parentConfig: any = { workspace: true };
+
+      // Try to find an existing page to use as parent
+      // This is required for MCP tokens (internal integrations)
+      const existingPages = await this.searchPages("", validToken);
+      
+      if (existingPages.length > 0) {
+        // Use the first page as parent
+        parentConfig = { page_id: existingPages[0].id };
+        logger.info("[Notion] Using existing page as parent for new page", {
+          parentPageId: existingPages[0].id,
+          parentPageTitle: existingPages[0].title,
+          userId
+        });
+      }
+
+      const properties: Record<string, any> = {
+        title: {
+          title: [{ text: { content: title } }],
+        },
+      };
+
+      return await this.createPage({
+        parent: parentConfig,
+        properties,
+        children: content
+          ? [
+              {
+                object: "block",
+                type: "paragraph",
+                paragraph: {
+                  rich_text: [
+                    {
+                      type: "text",
+                      text: { content: content },
+                    },
+                  ],
+                },
+              },
+            ]
+          : undefined,
+        token: validToken,
+      });
+    } catch (error) {
+      logger.error("[Notion] Failed to create page with automatic parent", error);
+      throw error;
+    }
   }
 }
 
