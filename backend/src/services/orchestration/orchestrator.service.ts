@@ -1043,6 +1043,15 @@ ${resumeResult.nextSteps.map((step, i) => `${i + 1}. ${step}`).join('\n')}
 
     // Get Notion token from user (try REST first, then MCP)
     const notionToken = user?.notionRestAccessToken || user?.notionMcpAccessToken;
+    const normalizedAction = action.toLowerCase().trim();
+    const workflowName = normalizedAction.split(/\s+/)[0] || normalizedAction;
+    const target = String(parameters.target || '').trim();
+    const targetLower = target.toLowerCase();
+    const isDatabaseRequest =
+      targetLower.includes('database') ||
+      targetLower.includes('table') ||
+      normalizedAction.includes('database') ||
+      normalizedAction.includes('table');
 
     // Workflow execution logic
     const workflows: Record<string, () => Promise<any>> = {
@@ -1105,6 +1114,77 @@ ${resumeResult.nextSteps.map((step, i) => `${i + 1}. ${step}`).join('\n')}
           
           throw new Error(`Failed to create Notion page: ${error.message}`);
         }
+      },
+
+      'build': async () => {
+        if (isDatabaseRequest) {
+          const restToken = user?.notionRestAccessToken || user?.notionToken;
+          if (!restToken && !envVars.NOTION_API_KEY) {
+            throw new Error('Notion REST token not configured. Please connect Notion REST in Settings.');
+          }
+
+          const orinPage = await notionWriteService.getOrCreateORINPageForUser(user.id);
+          const databaseTitle = this.toDatabaseTitle(target || 'Untitled Database');
+
+          logger.info('[Workflow] Creating Notion database in ORIN page', {
+            databaseTitle,
+            orinPageId: orinPage.id,
+          });
+
+          const database = await notionService.createDatabase({
+            parent: { type: 'page_id', page_id: orinPage.id },
+            title: databaseTitle,
+            properties: {
+              Name: {
+                title: {},
+              },
+              Status: {
+                select: {
+                  options: [
+                    { name: 'Planned', color: 'default' },
+                    { name: 'In Progress', color: 'blue' },
+                    { name: 'Blocked', color: 'red' },
+                    { name: 'Done', color: 'green' },
+                  ],
+                },
+              },
+              Priority: {
+                select: {
+                  options: [
+                    { name: 'Low', color: 'gray' },
+                    { name: 'Medium', color: 'yellow' },
+                    { name: 'High', color: 'orange' },
+                    { name: 'Critical', color: 'red' },
+                  ],
+                },
+              },
+              'Due Date': {
+                date: {},
+              },
+              Notes: {
+                rich_text: {},
+              },
+            },
+            token: restToken || envVars.NOTION_API_KEY,
+          });
+
+          const databaseUrl = (database as any).url || `https://notion.so/${database.id.replace(/-/g, '')}`;
+
+          return {
+            status: 'completed',
+            message: `Created Notion database "${databaseTitle}" inside the ORIN page.`,
+            references: [orinPage.url, databaseUrl],
+            details: {
+              pageId: orinPage.id,
+              pageTitle: 'ORIN',
+              databaseId: database.id,
+              databaseTitle,
+              databaseUrl,
+            }
+          };
+        }
+
+        return workflows.create();
       },
 
       'list': async () => {
@@ -1211,8 +1291,6 @@ ${resumeResult.nextSteps.map((step, i) => `${i + 1}. ${step}`).join('\n')}
       }
     };
 
-    // Extract workflow name from action (first word)
-    const workflowName = action.toLowerCase().split(/\s+/)[0] || action.toLowerCase();
     const workflow = workflows[workflowName];
 
     if (workflow) {
@@ -1230,6 +1308,15 @@ ${resumeResult.nextSteps.map((step, i) => `${i + 1}. ${step}`).join('\n')}
         }
       };
     }
+  }
+
+  private toDatabaseTitle(target: string): string {
+    return target
+      .replace(/\b(build|create|make)\b/gi, '')
+      .replace(/\b(a|an|the)\b/gi, '')
+      .trim()
+      .replace(/\s+/g, ' ')
+      .replace(/^./, (char) => char.toUpperCase()) || 'Untitled Database';
   }
 }
 
