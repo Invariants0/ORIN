@@ -1,6 +1,7 @@
 import intentService from '../ai/intent.service.js';
 import geminiService from '../ai/gemini.service.js';
 import notionService from '../integrations/notion.service.js';
+import notionMcpClientService from '../integrations/notion-mcp-client.service.js';
 import notionWriteService from '../integrations/notion-write.service.js';
 import contextRetrievalService from '../integrations/context-retrieval.service.js';
 import resumeService from '../infrastructure/resume.service.js';
@@ -12,6 +13,7 @@ import envVars from '../../config/envVars.js';
 import db from '../../config/database.js';
 import { IntentType, StoreIntent, QueryIntent, GenerateDocIntent, OperateIntent } from '../../types/intent.types.js';
 import { isNotionPermissionError, getNotionErrorMessage } from '../../utils/notion-errors.js';
+import { GeminiAPIError } from '../../utils/errors.js';
 
 export interface OrchestratorResponse {
   intent: string;
@@ -45,7 +47,30 @@ class OrchestratorService {
         hasUserKey: !!apiKey
       });
 
-      // Step 0: Use Meta-Orchestrator to decide strategy
+      // Step 0: PRIORITY - Detect Intent FIRST (before strategy decision)
+      // This allows direct action requests (OPERATE) to bypass strategy routing
+      const intentResult = await intentService.detectIntent(input, apiKey);
+      logger.info('[Orchestrator] Intent detected', { 
+        intent: intentResult.intent.type, 
+        confidence: intentResult.confidence 
+      });
+
+      // If we detected a direct action (OPERATE intent), execute it immediately
+      // Don't wait for meta-orchestrator strategy - user wants to DO something, not plan
+      if (intentResult.intent.type === IntentType.OPERATE) {
+        logger.info('[Orchestrator] OPERATE intent detected - bypassing strategy, executing directly');
+        servicesUsed.push('workflow-engine');
+        
+        const response = await this.handleOperateIntent(
+          intentResult.intent as OperateIntent, 
+          userId, 
+          servicesUsed,
+          apiKey
+        );
+        return response;
+      }
+
+      // Step 1: Use Meta-Orchestrator to decide strategy (for non-action intents)
       const decision = await metaOrchestratorService.decideStrategy(input, userId, sessionId);
 
       logger.info('[Orchestrator] Strategy decided by meta-orchestrator', {
@@ -137,27 +162,20 @@ class OrchestratorService {
         }
       }
 
-      // Step 1: Detect Intent
-      const intentResult = await intentService.detectIntent(input, apiKey);
-      logger.info('[Orchestrator] Intent detected', { 
-        intent: intentResult.intent.type, 
-        confidence: intentResult.confidence 
-      });
-
-      // Step 2: Route based on intent
+      // Step 2: Route based on intent (at this point we know intent is NOT OPERATE)
       let response: OrchestratorResponse;
 
       switch (intentResult.intent.type) {
         case IntentType.STORE:
-          response = await this.handleStoreIntent(intentResult.intent as StoreIntent, userId, servicesUsed, apiKey);
+          response = await this.handleStoreIntent(intentResult.intent as StoreIntent, userId, servicesUsed, startTime, apiKey);
           break;
 
         case IntentType.QUERY:
-          response = await this.handleQueryIntent(intentResult.intent as QueryIntent, userId, servicesUsed, apiKey);
+          response = await this.handleQueryIntent(intentResult.intent as QueryIntent, userId, servicesUsed, startTime, apiKey);
           break;
 
         case IntentType.GENERATE_DOC:
-          response = await this.handleGenerateDocIntent(intentResult.intent as GenerateDocIntent, userId, servicesUsed, apiKey);
+          response = await this.handleGenerateDocIntent(intentResult.intent as GenerateDocIntent, userId, servicesUsed, startTime, apiKey);
           break;
 
         case IntentType.OPERATE:
@@ -192,15 +210,36 @@ class OrchestratorService {
         userId 
       });
 
+      // Determine user message based on error type
+      let userMessage = 'I encountered an error processing your request. Please try again or rephrase your input.';
+      
+      // Check for Gemini API key errors
+      if (error instanceof GeminiAPIError) {
+        userMessage = error.message;
+      } 
+      // Check for integration errors (Notion, OAuth, etc.)
+      else if (error.message && error.message.includes('Notion')) {
+        userMessage = error.message;
+      }
+      else if (error.message && error.message.includes('token not configured')) {
+        userMessage = error.message;
+      }
+      else if (error.message && error.message.includes('API token')) {
+        userMessage = error.message;
+      }
+
       // Graceful fallback
       return {
         intent: 'ERROR',
-        output: 'I encountered an error processing your request. Please try again or rephrase your input.',
+        output: userMessage,
         references: [],
         actions: [{
           type: 'error',
           status: 'failed',
-          details: { message: error.message }
+          details: { 
+            message: error.message,
+            errorCode: error.code 
+          }
         }],
         metadata: {
           processingTimeMs: Date.now() - startTime,
@@ -215,6 +254,7 @@ class OrchestratorService {
     intent: StoreIntent, 
     userId: string, 
     servicesUsed: string[],
+    startTime: number,
     apiKey?: string
   ): Promise<OrchestratorResponse> {
     logger.info('[Orchestrator] Handling STORE intent', { userId });
@@ -344,6 +384,29 @@ Your content is safely stored in the local database for now.`,
 
     } catch (error: any) {
       logger.error('[Orchestrator] STORE intent failed', { error: error.message });
+      
+      // Check for Gemini API key errors
+      if (error instanceof GeminiAPIError) {
+        return {
+          intent: IntentType.STORE,
+          output: error.message,
+          references: [],
+          actions: [{
+            type: 'error',
+            status: 'failed',
+            details: { 
+              message: error.message,
+              errorCode: error.code 
+            }
+          }],
+          metadata: {
+            processingTimeMs: Date.now() - startTime,
+            confidence: 0,
+            servicesUsed
+          }
+        };
+      }
+      
       throw error;
     }
   }
@@ -429,6 +492,28 @@ The task is now marked as "in progress". Let me know when you're done!`;
 
     } catch (error: any) {
       logger.error('[Orchestrator] TASK_EXECUTION failed', { error: error.message });
+
+      // Check for Gemini API key errors
+      if (error instanceof GeminiAPIError) {
+        return {
+          intent: 'TASK_EXECUTION',
+          output: error.message,
+          references: [],
+          actions: [{
+            type: 'task_execution',
+            status: 'failed',
+            details: { 
+              message: error.message,
+              errorCode: error.code 
+            }
+          }],
+          metadata: {
+            processingTimeMs: Date.now() - startTime,
+            confidence: 0,
+            servicesUsed
+          }
+        };
+      }
 
       return {
         intent: 'TASK_EXECUTION',
@@ -606,14 +691,24 @@ All tasks have been saved and are ready to track. You can start working on them 
     } catch (error: any) {
       logger.error('[Orchestrator] TASK_DECOMPOSITION failed', { error: error.message });
 
+      // Check for Gemini API key errors
+      let userMessage = 'I encountered an error while breaking down your goal into tasks. Please try rephrasing your goal or try again.';
+      
+      if (error instanceof GeminiAPIError) {
+        userMessage = error.message;
+      }
+
       return {
         intent: 'TASK_DECOMPOSITION',
-        output: 'I encountered an error while breaking down your goal into tasks. Please try rephrasing your goal or try again.',
+        output: userMessage,
         references: [],
         actions: [{
           type: 'task_decomposition',
           status: 'failed',
-          details: { error: error.message }
+          details: { 
+            error: error.message,
+            errorCode: error.code 
+          }
         }],
         metadata: {
           processingTimeMs: Date.now() - startTime,
@@ -675,6 +770,28 @@ ${resumeResult.nextSteps.map((step, i) => `${i + 1}. ${step}`).join('\n')}
     } catch (error: any) {
       logger.error('[Orchestrator] RESUME request failed', { error: error.message });
 
+      // Check for Gemini API key errors
+      if (error instanceof GeminiAPIError) {
+        return {
+          intent: 'RESUME',
+          output: error.message,
+          references: [],
+          actions: [{
+            type: 'resume_work',
+            status: 'failed',
+            details: { 
+              message: error.message,
+              errorCode: error.code 
+            }
+          }],
+          metadata: {
+            processingTimeMs: Date.now() - startTime,
+            confidence: 0,
+            servicesUsed
+          }
+        };
+      }
+
       return {
         intent: 'RESUME',
         output: 'I couldn\'t find any recent work to resume. Try starting a new conversation or provide more context.',
@@ -697,6 +814,7 @@ ${resumeResult.nextSteps.map((step, i) => `${i + 1}. ${step}`).join('\n')}
     intent: QueryIntent, 
     userId: string, 
     servicesUsed: string[],
+    startTime: number,
     apiKey?: string
   ): Promise<OrchestratorResponse> {
     logger.info('[Orchestrator] Handling QUERY intent', { userId, question: intent.question });
@@ -760,6 +878,29 @@ ${resumeResult.nextSteps.map((step, i) => `${i + 1}. ${step}`).join('\n')}
 
     } catch (error: any) {
       logger.error('[Orchestrator] QUERY intent failed', { error: error.message });
+      
+      // Check for Gemini API key errors
+      if (error instanceof GeminiAPIError) {
+        return {
+          intent: IntentType.QUERY,
+          output: error.message,
+          references: [],
+          actions: [{
+            type: 'error',
+            status: 'failed',
+            details: { 
+              message: error.message,
+              errorCode: error.code 
+            }
+          }],
+          metadata: {
+            processingTimeMs: Date.now() - startTime,
+            confidence: 0,
+            servicesUsed
+          }
+        };
+      }
+      
       throw error;
     }
   }
@@ -768,6 +909,7 @@ ${resumeResult.nextSteps.map((step, i) => `${i + 1}. ${step}`).join('\n')}
     intent: GenerateDocIntent, 
     userId: string, 
     servicesUsed: string[],
+    startTime: number,
     apiKey?: string
   ): Promise<OrchestratorResponse> {
     logger.info('[Orchestrator] Handling GENERATE_DOC intent', { userId, topic: intent.topic });
@@ -829,6 +971,29 @@ ${resumeResult.nextSteps.map((step, i) => `${i + 1}. ${step}`).join('\n')}
 
     } catch (error: any) {
       logger.error('[Orchestrator] GENERATE_DOC intent failed', { error: error.message });
+      
+      // Check for Gemini API key errors
+      if (error instanceof GeminiAPIError) {
+        return {
+          intent: IntentType.GENERATE_DOC,
+          output: error.message,
+          references: [],
+          actions: [{
+            type: 'error',
+            status: 'failed',
+            details: { 
+              message: error.message,
+              errorCode: error.code 
+            }
+          }],
+          metadata: {
+            processingTimeMs: Date.now() - startTime,
+            confidence: 0,
+            servicesUsed
+          }
+        };
+      }
+      
       throw error;
     }
   }
@@ -843,8 +1008,14 @@ ${resumeResult.nextSteps.map((step, i) => `${i + 1}. ${step}`).join('\n')}
     servicesUsed.push('workflow-engine');
 
     try {
+      // Fetch user to get their credentials
+      const user = await db.user.findUnique({ where: { id: userId } });
+      if (!user) {
+        throw new Error('User not found');
+      }
+
       // Execute workflow based on action
-      const workflowResult = await this.executeWorkflow(intent.action, intent.parameters, userId);
+      const workflowResult = await this.executeWorkflow(intent.action, intent.parameters, userId, user);
 
       return {
         intent: IntentType.OPERATE,
@@ -900,7 +1071,8 @@ ${resumeResult.nextSteps.map((step, i) => `${i + 1}. ${step}`).join('\n')}
   private async executeWorkflow(
     action: string, 
     parameters: Record<string, any>, 
-    userId: string
+    userId: string,
+    user?: any
   ): Promise<{
     status: string;
     message: string;
@@ -909,8 +1081,112 @@ ${resumeResult.nextSteps.map((step, i) => `${i + 1}. ${step}`).join('\n')}
   }> {
     logger.info('[Orchestrator] Executing workflow', { action, parameters, userId });
 
+    // Get Notion token from user (try REST first, then MCP, then legacy notionToken)
+    const notionToken = user?.notionRestAccessToken || user?.notionMcpAccessToken || user?.notionToken;
+
     // Workflow execution logic
     const workflows: Record<string, () => Promise<any>> = {
+      'create': async () => {
+        // Handle Notion page creation via MCP (NOT REST API)
+        if (!notionToken) {
+          throw new Error('Notion MCP token not configured. Please connect Notion MCP in Settings.');
+        }
+
+        const pageTitle = parameters.target || 'Untitled Page';
+        logger.info('[Workflow] Creating Notion page via MCP', { pageTitle });
+
+        try {
+          // Use MCP client (proper implementation per Notion's official guide)
+          // NOT the REST API client - MCP tokens don't work with REST API
+          const pageResult = await notionMcpClientService.createPage(
+            user.id,
+            pageTitle,
+            `Created by ORIN at ${new Date().toISOString()}`
+          );
+
+          logger.info('[Workflow] Notion page created successfully', { pageTitle, pageResult });
+
+          // Extract page URL from MCP response
+          // MCP response typically contains page IDs or URLs
+          let pageUrl = 'https://notion.so';
+          if (pageResult?.content) {
+            // Try to extract page ID from response
+            const pageIdMatch = pageResult.content.match(/notion\.so\/([a-f0-9]{32})|id["\s:]*([a-f0-9-]+)/i);
+            if (pageIdMatch) {
+              const pageId = pageIdMatch[1] || pageIdMatch[2];
+              pageUrl = `https://notion.so/${pageId.replace(/-/g, '')}`;
+            }
+          }
+
+          return {
+            status: 'completed',
+            message: `✅ Successfully created Notion page titled "${pageTitle}".\n🔗 Open in Notion: ${pageUrl}`,
+            references: [pageTitle, pageUrl],
+            details: {
+              pageTitle,
+              pageUrl,
+              createdAt: new Date().toISOString(),
+              mcpResponse: pageResult
+            }
+          };
+        } catch (error: any) {
+          logger.error('[Workflow] Notion page creation via MCP failed', { 
+            error: error.message, 
+            userId: user.id 
+          });
+          
+          // Better error message
+          if (error.message?.includes('not configured')) {
+            throw new Error('Notion MCP token not configured. Please reconnect in Settings.');
+          }
+          if (error.message?.includes('invalid')) {
+            throw new Error('Notion MCP token invalid or expired. Please reconnect in Settings.');
+          }
+          
+          throw new Error(`Failed to create Notion page: ${error.message}`);
+        }
+      },
+
+      'list': async () => {
+        // Handle Notion page listing via MCP
+        if (!notionToken) {
+          throw new Error('Notion MCP token not configured. Please connect Notion MCP in Settings.');
+        }
+
+        logger.info('[Workflow] Listing Notion pages via MCP');
+
+        try {
+          // Use MCP client to list available tools/resources
+          const tools = await notionMcpClientService.listPages(user.id);
+          
+          logger.info('[Workflow] Retrieved MCP tools', { count: tools?.length || 0 });
+
+          return {
+            status: 'completed',
+            message: `📄 Notion MCP connected! Available operations: ${tools?.length || 0} tools ready to use.`,
+            references: [],
+            details: {
+              toolCount: tools?.length || 0,
+              tools: tools?.map((t: any) => t.name).slice(0, 10) // Show first 10
+            }
+          };
+        } catch (error: any) {
+          logger.error('[Workflow] Notion page listing via MCP failed', { 
+            error: error.message,
+            userId: user.id
+          });
+          
+          if (error.message?.includes('not configured')) {
+            throw new Error('Notion MCP token not configured. Please reconnect in Settings.');
+          }
+          if (error.message?.includes('invalid') || error.message?.includes('unauthorized')) {
+            throw new Error('Notion MCP token invalid or expired. Please reconnect in Settings.');
+          }
+          
+          throw new Error(`Failed to list Notion pages: ${error.message}`);
+        }
+      },
+
       'backup': async () => {
         // Simulate backup workflow
         const databaseId = envVars.NOTION_DATABASE_ID || '';
@@ -975,8 +1251,8 @@ ${resumeResult.nextSteps.map((step, i) => `${i + 1}. ${step}`).join('\n')}
       }
     };
 
-    // Extract workflow name from action
-    const workflowName = action.toLowerCase().replace(/[^a-z]/g, '');
+    // Extract workflow name from action (first word)
+    const workflowName = action.toLowerCase().split(/\s+/)[0] || action.toLowerCase();
     const workflow = workflows[workflowName];
 
     if (workflow) {
@@ -985,11 +1261,12 @@ ${resumeResult.nextSteps.map((step, i) => `${i + 1}. ${step}`).join('\n')}
       // Unknown workflow
       return {
         status: 'failed',
-        message: `Unknown workflow action: ${action}. Available workflows: backup, sync, export, cleanup.`,
+        message: `I don't know how to execute "${action}". Please try: create, list, backup, sync, export, or cleanup.`,
         references: [],
         details: {
           error: 'Workflow not found',
-          availableWorkflows: Object.keys(workflows)
+          availableWorkflows: Object.keys(workflows),
+          requestedAction: action
         }
       };
     }
