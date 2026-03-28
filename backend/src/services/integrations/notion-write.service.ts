@@ -95,6 +95,15 @@ class NotionWriteService {
     }
   }
 
+  async getOrCreateORINPageForUser(userId: string): Promise<{ id: string; url: string }> {
+    const token = await this.getUserNotionRestToken(userId);
+    if (!token && !envVars.NOTION_API_KEY) {
+      throw new Error("No Notion REST token available. Connect Notion REST first.");
+    }
+
+    return this.getOrCreateORINPage(token || undefined);
+  }
+
   /**
    * Get emoji icon for content type
    */

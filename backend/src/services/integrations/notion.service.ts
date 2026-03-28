@@ -190,6 +190,42 @@ export class NotionService {
     }
   }
 
+  async createDatabase(params: {
+    parent: { type: "page_id"; page_id: string };
+    title: string;
+    properties: Record<string, any>;
+    token?: string;
+  }) {
+    try {
+      const client = this.getClient(params.token);
+      const database = await (client.databases as any).create({
+        parent: params.parent,
+        title: [
+          {
+            type: "text",
+            text: {
+              content: params.title,
+            },
+          },
+        ],
+        initial_data_source: {
+          properties: params.properties,
+        },
+      });
+
+      logger.info("[Notion] Created database", {
+        databaseId: database.id,
+        title: params.title,
+        parentPageId: params.parent.page_id,
+      });
+
+      return database;
+    } catch (error) {
+      logger.error("[Notion] Failed to create database", error);
+      throw error;
+    }
+  }
+
   async findPageByExactTitle(title: string, token?: string) {
     try {
       const client = this.getClient(token);
