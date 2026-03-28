@@ -35,6 +35,8 @@ export interface OrinUser {
   avatar?: string;
   geminiKey?: string;
   notionToken?: string;
+  notionRestAccessToken?: string;
+  notionMcpAccessToken?: string;
 }
 
 export interface OrinConnections {

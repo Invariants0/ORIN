@@ -44,12 +44,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             name: currentUser.name || "User",
             avatar: currentUser.image || undefined,
             geminiKey: (currentUser as any).geminiKey,
-            notionToken: (currentUser as any).notionToken
+            notionToken: (currentUser as any).notionToken,
+            notionRestAccessToken: (currentUser as any).notionRestAccessToken,
+            notionMcpAccessToken: (currentUser as any).notionMcpAccessToken
           });
 
           const hasGemini = Boolean((currentUser as any).geminiKey);
-          const hasNotion = Boolean((currentUser as any).notionToken);
-          const isSetupComplete = hasGemini && hasNotion;
+          const hasNotionMcp = Boolean((currentUser as any).notionMcpAccessToken);
+          const isSetupComplete = hasGemini && hasNotionMcp;
           const isAuthOrOnboarding = pathname === "/auth" || pathname === "/onboarding";
           if (isAuthOrOnboarding) {
             router.push(isSetupComplete ? "/dashboard" : "/onboarding");

@@ -20,7 +20,13 @@ import Image from 'next/image';
 export const Topbar = () => {
   const { mode, setMode, connections, setIsAccountOpen, user: storeUser } = useOrinStore();
   const { user } = useAuth();
-  const notionConnected = Boolean((storeUser as any)?.notionToken || (user as any)?.notionToken);
+  const notionConnected = Boolean(
+    (storeUser as any)?.notionMcpAccessToken ||
+    (storeUser as any)?.notionRestAccessToken ||
+    (user as any)?.notionMcpAccessToken ||
+    (user as any)?.notionRestAccessToken ||
+    (user as any)?.notionToken
+  );
 
   return (
     <header className="h-14 bg-white border-b-2 border-black flex items-center justify-between px-5 sticky top-0 z-30 flex-shrink-0">
