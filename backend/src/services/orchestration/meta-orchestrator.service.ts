@@ -6,7 +6,6 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 export enum StrategyType {
-  DECOMPOSE = 'decompose',
   EXECUTE = 'execute',
   RESUME = 'resume',
   RESPOND = 'respond',
@@ -174,7 +173,6 @@ class MetaOrchestratorService {
     context: DecisionContext
   ): Promise<Record<StrategyType, { score: number; reasons: string[] }>> {
     const scores: Record<StrategyType, { score: number; reasons: string[] }> = {
-      [StrategyType.DECOMPOSE]: { score: 0, reasons: [] },
       [StrategyType.EXECUTE]: { score: 0, reasons: [] },
       [StrategyType.RESUME]: { score: 0, reasons: [] },
       [StrategyType.RESPOND]: { score: 0, reasons: [] },
@@ -183,24 +181,8 @@ class MetaOrchestratorService {
 
     const input = context.input.toLowerCase();
 
-    // DECOMPOSE scoring (but not if it's a store/query request)
     const isExplicitStore = this.isStoreRequest(input);
     const isExplicitQuery = this.isQueryRequest(input);
-    
-    if (this.isGoalInput(input) && !isExplicitStore && !isExplicitQuery) {
-      scores[StrategyType.DECOMPOSE].score += 40;
-      scores[StrategyType.DECOMPOSE].reasons.push('Input looks like a goal/project');
-    }
-
-    if (context.hasSession && !context.hasTasks && !isExplicitStore && !isExplicitQuery) {
-      scores[StrategyType.DECOMPOSE].score += 20;
-      scores[StrategyType.DECOMPOSE].reasons.push('Session exists but no tasks yet');
-    }
-
-    if (input.length > 30 && input.length < 300 && !isExplicitStore && !isExplicitQuery) {
-      scores[StrategyType.DECOMPOSE].score += 10;
-      scores[StrategyType.DECOMPOSE].reasons.push('Input length suitable for goal');
-    }
 
     // EXECUTE scoring
     if (this.isExecutionRequest(input)) {
@@ -438,7 +420,6 @@ class MetaOrchestratorService {
         : 0;
 
       const strategyDistribution: Record<StrategyType, number> = {
-        [StrategyType.DECOMPOSE]: 0,
         [StrategyType.EXECUTE]: 0,
         [StrategyType.RESUME]: 0,
         [StrategyType.RESPOND]: 0,
@@ -474,22 +455,6 @@ class MetaOrchestratorService {
   }
 
   // Helper methods for pattern detection
-
-  private isGoalInput(input: string): boolean {
-    const goalKeywords = [
-      'build', 'create', 'develop', 'implement', 'make',
-      'design', 'setup', 'configure', 'integrate',
-      'add feature', 'new feature', 'project',
-      'system', 'application', 'service', 'engine'
-    ];
-
-    return goalKeywords.some(keyword => input.includes(keyword)) &&
-           input.length > 15 &&
-           input.length < 500 &&
-           !input.startsWith('what') &&
-           !input.startsWith('how') &&
-           !input.includes('?');
-  }
 
   private isExecutionRequest(input: string): boolean {
     const executionKeywords = [
@@ -536,7 +501,7 @@ class MetaOrchestratorService {
   private isStoreRequest(input: string): boolean {
     const storeKeywords = [
       'save', 'store', 'remember', 'keep',
-      'note', 'add', 'record'
+      'note', 'add', 'record', 'dump'
     ];
 
     return storeKeywords.some(keyword => input.includes(keyword));

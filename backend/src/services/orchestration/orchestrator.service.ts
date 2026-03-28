@@ -94,13 +94,6 @@ class OrchestratorService {
           }
           break;
 
-        case StrategyType.DECOMPOSE:
-          logger.info('[Orchestrator] Executing DECOMPOSE strategy');
-          if (sessionId) {
-            return await this.handleTaskDecomposition(input, userId, sessionId, servicesUsed, startTime, apiKey);
-          }
-          break;
-
         case StrategyType.ASK:
           logger.info('[Orchestrator] Executing ASK strategy');
           return {
@@ -150,18 +143,6 @@ class OrchestratorService {
         return await this.handleTaskCompletion(userId, sessionId, servicesUsed, startTime);
       }
 
-      // Check if this is a goal that should be decomposed into tasks
-      // Skip this check if meta-orchestrator explicitly chose RESPOND (e.g., for store/query requests)
-      if (!metaChoseRespond && taskService.isGoalInput(input) && sessionId) {
-        logger.info('[Orchestrator] Goal input detected, checking for task decomposition');
-        const shouldDecompose = await this.shouldDecomposeIntoTasks(input);
-        
-        if (shouldDecompose) {
-          logger.info('[Orchestrator] Task decomposition triggered');
-          return await this.handleTaskDecomposition(input, userId, sessionId, servicesUsed, startTime);
-        }
-      }
-
       // Step 2: Route based on intent (at this point we know intent is NOT OPERATE)
       let response: OrchestratorResponse;
 
@@ -176,10 +157,6 @@ class OrchestratorService {
 
         case IntentType.GENERATE_DOC:
           response = await this.handleGenerateDocIntent(intentResult.intent as GenerateDocIntent, userId, servicesUsed, startTime, apiKey);
-          break;
-
-        case IntentType.OPERATE:
-          response = await this.handleOperateIntent(intentResult.intent as OperateIntent, userId, servicesUsed, apiKey);
           break;
 
         case IntentType.UNCLEAR:
@@ -270,6 +247,7 @@ class OrchestratorService {
           title: intent.suggestedTitle || classification.title,
           type: classification.type,
           tags: intent.tags || classification.tags,
+          summary: classification.summary,
           content: classification.content,
           source: intent.category,
           userId
@@ -300,13 +278,14 @@ class OrchestratorService {
 
         return {
           intent: IntentType.STORE,
-          output: `Successfully stored: "${intent.suggestedTitle || classification.title}". Your content has been saved to Notion.`,
+          output: `Successfully stored: "${intent.suggestedTitle || classification.title}". Your content has been appended to the ORIN page in Notion.`,
           references: [result.url],
           actions: [{
-            type: 'notion_create',
+            type: 'notion_append',
             status: 'completed',
             details: {
               pageId: result.pageId,
+              pageTitle: 'ORIN',
               title: classification.title,
               type: classification.type,
               tags: intent.tags || classification.tags,
@@ -409,27 +388,6 @@ Your content is safely stored in the local database for now.`,
       
       throw error;
     }
-  }
-
-  private async shouldDecomposeIntoTasks(input: string): Promise<boolean> {
-    // Simple heuristic: if input looks like a project/feature goal
-    const projectIndicators = [
-      'build',
-      'create',
-      'develop',
-      'implement',
-      'system',
-      'engine',
-      'feature',
-      'service',
-      'application'
-    ];
-
-    const inputLower = input.toLowerCase();
-    const hasProjectIndicator = projectIndicators.some(indicator => inputLower.includes(indicator));
-    const isReasonableLength = input.length > 20 && input.length < 300;
-
-    return hasProjectIndicator && isReasonableLength;
   }
 
   private async handleTaskExecution(
@@ -942,6 +900,7 @@ ${resumeResult.nextSteps.map((step, i) => `${i + 1}. ${step}`).join('\n')}
         title: document.title,
         type: 'document',
         tags: [intent.documentType, ...document.metadata.tags || []],
+        summary: typeof document.metadata?.summary === 'string' ? document.metadata.summary : undefined,
         content: document.content,
         source: `Generated document: ${intent.topic}`,
         userId
@@ -949,13 +908,14 @@ ${resumeResult.nextSteps.map((step, i) => `${i + 1}. ${step}`).join('\n')}
 
       return {
         intent: IntentType.GENERATE_DOC,
-        output: `Document "${document.title}" has been generated and saved to Notion.`,
+        output: `Document "${document.title}" has been generated and appended to the ORIN page in Notion.`,
         references: [result.url],
         actions: [{
           type: 'document_generation',
           status: 'completed',
           details: {
             pageId: result.pageId,
+            pageTitle: 'ORIN',
             title: document.title,
             documentType: intent.documentType,
             topic: intent.topic,
