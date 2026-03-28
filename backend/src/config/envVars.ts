@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { NOTION_CONFIG, AI_CONFIG, SYSTEM_CONFIG, AUTH_CONFIG } from "./constants.js";
 
 const EnvConfigSchema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
@@ -32,17 +33,14 @@ const EnvConfigSchema = z.object({
   NOTION_MCP_URL: z.string().optional(),
   NOTION_MCP_TOKEN: z.string().optional(),
   NOTION_MCP_PARENT_PAGE_ID: z.string().optional(),
+  
+  // Manual OAuth (optional - overrides derived values)
   NOTION_MCP_OAUTH_REDIRECT_URI: z.string().optional(),
-  NOTION_MCP_OAUTH_SUCCESS_REDIRECT: z.string().optional(),
   NOTION_OAUTH_CLIENT_ID: z.string().optional(),
   NOTION_OAUTH_CLIENT_SECRET: z.string().optional(),
   NOTION_OAUTH_REDIRECT_URI: z.string().optional(),
-  NOTION_OAUTH_AUTHORIZE_URL: z.string().optional(),
-  NOTION_OAUTH_TOKEN_URL: z.string().optional(),
-  NOTION_OAUTH_SUCCESS_REDIRECT: z.string().optional(),
-  NOTION_VERSION: z.string().optional(),
   
-  // Security (use defaults in development)
+  // Security
   SESSION_SECRET: z.string().optional(),
   JWT_SECRET: z.string().optional(),
   
@@ -56,58 +54,51 @@ const EnvConfigSchema = z.object({
 type EnvConfig = z.infer<typeof EnvConfigSchema> & {
   isReady: boolean;
   missingRequired: string[];
+  // Derived / Constant values
+  NOTION_VERSION: string;
+  NOTION_OAUTH_AUTHORIZE_URL: string;
+  NOTION_OAUTH_TOKEN_URL: string;
 };
 
 let envVars: EnvConfig;
 
 try {
   const parsed = EnvConfigSchema.parse(process.env);
+  const betterAuthUrl = parsed.BETTER_AUTH_URL || "http://localhost:8000/api/auth";
+  const backendBaseUrl = betterAuthUrl.replace("/api/auth", "");
   
+  // Derived Callback URLs
+  const googleCallback = parsed.GOOGLE_CALLBACK_URL || `${betterAuthUrl}/callback/google`;
+  const githubCallback = parsed.GITHUB_CALLBACK_URL || `${betterAuthUrl}/callback/github`;
+  const mcpCallback = parsed.NOTION_MCP_OAUTH_REDIRECT_URI || `${backendBaseUrl}${NOTION_CONFIG.MCP_CALLBACK_PATH}`;
+  const restCallback = parsed.NOTION_OAUTH_REDIRECT_URI || `${backendBaseUrl}${NOTION_CONFIG.REST_CALLBACK_PATH}`;
+
   // Check for required variables
   const missingRequired: string[] = [];
-  
-  if (!parsed.BETTER_AUTH_SECRET) {
-    missingRequired.push("BETTER_AUTH_SECRET");
-  }
-  
-  if (!parsed.GEMINI_API_KEY) {
-    missingRequired.push("GEMINI_API_KEY");
-  }
+  if (!parsed.BETTER_AUTH_SECRET) missingRequired.push("BETTER_AUTH_SECRET");
+  if (!parsed.GEMINI_API_KEY) missingRequired.push("GEMINI_API_KEY");
   
   const notionProvider = parsed.NOTION_PROVIDER || "mcp";
   if (notionProvider === "rest" && !parsed.NOTION_API_KEY) {
     missingRequired.push("NOTION_API_KEY");
   }
 
-  // Accept both legacy (secret_) and new (ntn_) token formats for server-level MCP usage
-  if (parsed.NOTION_MCP_TOKEN) {
-    const token = parsed.NOTION_MCP_TOKEN;
-    if (!token.startsWith("secret_") && !token.startsWith("ntn_")) {
-      console.warn("⚠️  Warning: NOTION_MCP_TOKEN format may be invalid. Expected format: 'secret_*' or 'ntn_*'");
-    }
-  } else if (notionProvider === "mcp") {
-    console.warn("⚠️  Warning: NOTION_MCP_TOKEN not set. MCP calls will require user OAuth tokens.");
-  }
-
-  // NOTION_DATABASE_ID is optional - system will work without it
-  if (!parsed.NOTION_DATABASE_ID) {
-    console.warn("⚠️  Warning: NOTION_DATABASE_ID not set. Pages will be created at workspace level.");
-  }
-
-  if (!parsed.NOTION_MCP_OAUTH_REDIRECT_URI) {
-    console.warn("⚠️  Warning: NOTION_MCP_OAUTH_REDIRECT_URI not set. MCP OAuth flow will not work.");
-  }
-  
   // Final variables mapping
   const finalVars = {
     ...parsed,
     DATABASE_URL: parsed.DATABASE_URL || "file:./dev.db",
-    BETTER_AUTH_URL: parsed.BETTER_AUTH_URL || "http://localhost:8000/api/auth",
-    GEMINI_MODEL: parsed.GEMINI_MODEL || "gemini-2.5-flash",
+    BETTER_AUTH_URL: betterAuthUrl,
+    GOOGLE_CALLBACK_URL: googleCallback,
+    GITHUB_CALLBACK_URL: githubCallback,
+    GEMINI_MODEL: parsed.GEMINI_MODEL || AI_CONFIG.GEMINI_MODEL_DEFAULT,
     NOTION_PROVIDER: notionProvider,
-    NOTION_MCP_URL: parsed.NOTION_MCP_URL || "https://mcp.notion.com/mcp",
-    NOTION_MCP_OAUTH_SUCCESS_REDIRECT: parsed.NOTION_MCP_OAUTH_SUCCESS_REDIRECT || parsed.FRONTEND_URL || "http://localhost:3000",
-    MONITORING_ENABLED: parsed.MONITORING_ENABLED || "true",
+    NOTION_MCP_URL: parsed.NOTION_MCP_URL || NOTION_CONFIG.MCP_URL_DEFAULT,
+    NOTION_MCP_OAUTH_REDIRECT_URI: mcpCallback,
+    NOTION_OAUTH_REDIRECT_URI: restCallback,
+    NOTION_VERSION: NOTION_CONFIG.VERSION,
+    NOTION_OAUTH_AUTHORIZE_URL: NOTION_CONFIG.REST_AUTHORIZE_URL,
+    NOTION_OAUTH_TOKEN_URL: NOTION_CONFIG.REST_TOKEN_URL,
+    MONITORING_ENABLED: parsed.MONITORING_ENABLED || SYSTEM_CONFIG.MONITORING_DEFAULT,
     isReady: missingRequired.length === 0,
     missingRequired,
   };
@@ -116,10 +107,7 @@ try {
   
   // Warn about missing vars in development
   if (missingRequired.length > 0 && process.env.NODE_ENV !== "production") {
-    console.warn("⚠️  Warning: Missing environment variables:");
-    console.warn(missingRequired.join(", "));
-    console.warn("\nSome features may not work. See .env.example for details.");
-    console.warn("\n📝 Quick setup:\n   cp .env.example .env\n   Edit .env and add your API keys\n");
+    console.warn("⚠️  Warning: Missing environment variables:", missingRequired.join(", "));
   }
   
 } catch (error) {
