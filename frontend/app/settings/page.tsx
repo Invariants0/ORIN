@@ -22,6 +22,8 @@ import {
   Globe,
   Trash2,
   ExternalLink,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -52,6 +54,9 @@ export default function SettingsPage() {
   const [email, setEmail] = useState('');
   const [geminiKey, setGeminiKey] = useState('');
   const [notionKey, setNotionKey] = useState('');
+  const [showGeminiKey, setShowGeminiKey] = useState(false);
+  const [showNotionKey, setShowNotionKey] = useState(false);
+  const [showNotionMcpKey, setShowNotionMcpKey] = useState(false);
   const notionRestConnected = Boolean(
     notionKey || (storeUser as any)?.notionRestAccessToken || (storeUser as any)?.notionToken
   );
@@ -438,6 +443,8 @@ export default function SettingsPage() {
                           desc: 'Powers all AI reasoning in ORIN.',
                           link: 'https://aistudio.google.com/app/apikey',
                           linkText: 'Get key →',
+                          showValue: showGeminiKey,
+                          onToggleShow: setShowGeminiKey,
                         },
                         {
                           label: 'Notion REST Token (Managed by OAuth)',
@@ -448,6 +455,8 @@ export default function SettingsPage() {
                           link: 'https://www.notion.so/my-integrations',
                           linkText: 'Manage integrations →',
                           disabled: true,
+                          showValue: showNotionKey,
+                          onToggleShow: setShowNotionKey,
                         },
                         {
                           label: 'Notion MCP Token (Managed by OAuth)',
@@ -458,6 +467,8 @@ export default function SettingsPage() {
                           link: 'https://developers.notion.com/guides/mcp/build-mcp-client',
                           linkText: 'MCP docs â†’',
                           disabled: true,
+                          showValue: showNotionMcpKey,
+                          onToggleShow: setShowNotionMcpKey,
                         },
                       ].map((field) => (
                         <Card key={field.label} variant="white" className="p-6 space-y-4">
@@ -467,13 +478,29 @@ export default function SettingsPage() {
                               {field.linkText}
                             </a>
                           </div>
-                          <BrandInput
-                            type="password"
-                            placeholder={field.placeholder}
-                            value={field.value}
-                            onChange={(e) => field.onChange(e.target.value)}
-                            disabled={(field as any).disabled}
-                          />
+                          <div className="relative">
+                            <BrandInput
+                              type={(field as any).showValue ? 'text' : 'password'}
+                              placeholder={field.placeholder}
+                              value={field.value}
+                              onChange={(e) => field.onChange(e.target.value)}
+                              disabled={(field as any).disabled}
+                            />
+                            {field.value && (
+                              <button
+                                type="button"
+                                onClick={() => (field as any).onToggleShow(!(field as any).showValue)}
+                                className="absolute right-4 top-1/2 -translate-y-1/2 text-black/40 hover:text-black transition-colors"
+                                aria-label={(field as any).showValue ? 'Hide key' : 'Show key'}
+                              >
+                                {(field as any).showValue ? (
+                                  <EyeOff className="w-5 h-5" />
+                                ) : (
+                                  <Eye className="w-5 h-5" />
+                                )}
+                              </button>
+                            )}
+                          </div>
                           <p className="text-xs font-bold text-black/40">{field.desc}</p>
                         </Card>
                       ))}

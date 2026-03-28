@@ -5,7 +5,7 @@ import { responseInterceptor, errorInterceptor } from './interceptors/error.inte
 
 const client = axios.create({
   baseURL: API_URL,
-  timeout: 10000,
+  timeout: 30000, // Increased from 10s to 30s for MCP operations (connection + creation ~4s)
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
