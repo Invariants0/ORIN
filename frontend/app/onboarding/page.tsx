@@ -33,9 +33,9 @@ export default function OnboardingPage() {
   }, [user]);
 
   useEffect(() => {
-    const notionConnected = Boolean((user as any)?.notionToken);
-    const fromOAuth = searchParams.get('notion') === 'connected';
-    if (fromOAuth || notionConnected) {
+    const notionMcpConnected = Boolean((user as any)?.notionMcpAccessToken);
+    const fromMcpOAuth = searchParams.get('notionMcp') === 'connected';
+    if (fromMcpOAuth || notionMcpConnected) {
       setStep(3);
     }
   }, [searchParams, user]);
@@ -62,9 +62,14 @@ export default function OnboardingPage() {
     }
   }, [apiKey, handleNext]);
 
-  const connectNotion = useCallback(() => {
+  const connectNotionRest = useCallback(() => {
     setIsConnecting(true);
     window.location.href = `${API_BASE_URL}/notion/oauth/start?returnTo=/onboarding`;
+  }, []);
+
+  const connectNotionMcp = useCallback(() => {
+    setIsConnecting(true);
+    window.location.href = `${API_BASE_URL}/notion/mcp/oauth/start?returnTo=/onboarding`;
   }, []);
 
   return (
@@ -173,14 +178,23 @@ export default function OnboardingPage() {
                         Authorize Orin to read/write to your workspace.
                       </p>
                     </div>
-                    <Button
-                      variant="secondary"
-                      onClick={connectNotion}
-                      isLoading={isConnecting}
-                      className="w-full py-4"
-                    >
-                      Authorize Notion
-                    </Button>
+                    <div className="w-full space-y-3">
+                      <Button
+                        variant="secondary"
+                        onClick={connectNotionMcp}
+                        isLoading={isConnecting}
+                        className="w-full py-4"
+                      >
+                        Authorize Notion MCP
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={connectNotionRest}
+                        className="w-full py-4"
+                      >
+                        Authorize Notion REST
+                      </Button>
+                    </div>
                   </div>
                   <Button variant="ghost" onClick={handleNext} className="w-full">
                     Skip for now

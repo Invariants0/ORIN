@@ -52,7 +52,10 @@ export default function SettingsPage() {
   const [email, setEmail] = useState('');
   const [geminiKey, setGeminiKey] = useState('');
   const [notionKey, setNotionKey] = useState('');
-  const notionConnected = Boolean(notionKey || (storeUser as any)?.notionToken);
+  const notionRestConnected = Boolean(
+    notionKey || (storeUser as any)?.notionRestAccessToken || (storeUser as any)?.notionToken
+  );
+  const notionMcpConnected = Boolean((storeUser as any)?.notionMcpAccessToken);
 
   // Update local state when user session loads
   React.useEffect(() => {
@@ -60,7 +63,7 @@ export default function SettingsPage() {
       setName(user.name);
       setEmail(user.email);
       setGeminiKey((user as any).geminiKey || '');
-      setNotionKey((user as any).notionToken || '');
+      setNotionKey((user as any).notionRestAccessToken || (user as any).notionToken || '');
     }
   }, [user]);
 
@@ -84,6 +87,7 @@ export default function SettingsPage() {
       } else if (activeTab === 'api') {
         const { error } = await authClient.updateUser({
           geminiKey: geminiKey,
+          notionRestAccessToken: notionKey,
           notionToken: notionKey,
         } as any);
 
@@ -93,6 +97,7 @@ export default function SettingsPage() {
           setStoreUser({
             ...storeUser,
             geminiKey: geminiKey,
+            notionRestAccessToken: notionKey,
             notionToken: notionKey,
           });
         }
@@ -121,9 +126,9 @@ export default function SettingsPage() {
         method: 'POST',
         credentials: 'include',
       });
-      await authClient.updateUser({ notionToken: '' } as any);
+      await authClient.updateUser({ notionRestAccessToken: '', notionToken: '' } as any);
       if (storeUser) {
-        setStoreUser({ ...storeUser, notionToken: '' });
+        setStoreUser({ ...storeUser, notionRestAccessToken: '', notionToken: '' });
       }
       setNotionKey('');
       toast.success('Notion disconnected', {
@@ -132,6 +137,34 @@ export default function SettingsPage() {
     } catch (err) {
       console.error("Failed to disconnect Notion", err);
       toast.error('Failed to disconnect Notion', {
+        description: 'Please try again.',
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleNotionMcpConnect = () => {
+    window.location.href = `${API_BASE_URL}/notion/mcp/oauth/start`;
+  };
+
+  const handleNotionMcpDisconnect = async () => {
+    try {
+      setIsSaving(true);
+      await fetch(`${API_BASE_URL}/notion/mcp/oauth/disconnect`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      await authClient.updateUser({ notionMcpAccessToken: '' } as any);
+      if (storeUser) {
+        setStoreUser({ ...storeUser, notionMcpAccessToken: '' });
+      }
+      toast.success('Notion MCP disconnected', {
+        description: 'Your MCP connection has been removed.',
+      });
+    } catch (err) {
+      console.error("Failed to disconnect Notion MCP", err);
+      toast.error('Failed to disconnect Notion MCP', {
         description: 'Please try again.',
       });
     } finally {
@@ -303,7 +336,7 @@ export default function SettingsPage() {
                         },
                       ].map((conn) => {
                         const Icon = conn.icon;
-                        const isConnected = conn.isNotion ? notionConnected : connections[conn.key];
+                        const isConnected = conn.isNotion ? notionRestConnected : connections[conn.key];
                         return (
                           <Card
                             key={conn.key}
@@ -326,23 +359,58 @@ export default function SettingsPage() {
                               <a href={conn.docsUrl} target="_blank" rel="noopener noreferrer" className="text-black/30 hover:text-black transition-colors">
                                 <ExternalLink className="w-4 h-4" />
                               </a>
-                              <Button
-                                variant={isConnected ? 'outline' : 'secondary'}
-                                size="sm"
-                                onClick={() => {
-                                  if (conn.isNotion) {
-                                    if (isConnected) {
-                                      handleNotionDisconnect();
-                                    } else {
-                                      handleNotionConnect();
-                                    }
-                                    return;
-                                  }
-                                  updateConnection(conn.key, !isConnected);
-                                }}
-                              >
-                                {isConnected ? 'Disconnect' : 'Connect'}
-                              </Button>
+                              {conn.isNotion ? (
+                                <div className="flex flex-col items-end gap-2">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[10px] font-black uppercase text-black/40">REST</span>
+                                    {notionRestConnected
+                                      ? <BrandBadge variant="sage" className="text-[10px]">CONNECTED</BrandBadge>
+                                      : <BrandBadge variant="white" className="text-[10px]">NOT CONNECTED</BrandBadge>}
+                                    <Button
+                                      variant={notionRestConnected ? 'outline' : 'secondary'}
+                                      size="sm"
+                                      onClick={() => {
+                                        if (notionRestConnected) {
+                                          handleNotionDisconnect();
+                                        } else {
+                                          handleNotionConnect();
+                                        }
+                                      }}
+                                    >
+                                      {notionRestConnected ? 'Disconnect' : 'Connect'}
+                                    </Button>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[10px] font-black uppercase text-black/40">MCP</span>
+                                    {notionMcpConnected
+                                      ? <BrandBadge variant="sage" className="text-[10px]">CONNECTED</BrandBadge>
+                                      : <BrandBadge variant="white" className="text-[10px]">NOT CONNECTED</BrandBadge>}
+                                    <Button
+                                      variant={notionMcpConnected ? 'outline' : 'secondary'}
+                                      size="sm"
+                                      onClick={() => {
+                                        if (notionMcpConnected) {
+                                          handleNotionMcpDisconnect();
+                                        } else {
+                                          handleNotionMcpConnect();
+                                        }
+                                      }}
+                                    >
+                                      {notionMcpConnected ? 'Disconnect' : 'Connect'}
+                                    </Button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <Button
+                                  variant={isConnected ? 'outline' : 'secondary'}
+                                  size="sm"
+                                  onClick={() => {
+                                    updateConnection(conn.key, !isConnected);
+                                  }}
+                                >
+                                  {isConnected ? 'Disconnect' : 'Connect'}
+                                </Button>
+                              )}
                             </div>
                           </Card>
                         );
@@ -372,13 +440,23 @@ export default function SettingsPage() {
                           linkText: 'Get key →',
                         },
                         {
-                          label: 'Notion Token (Managed by OAuth)',
+                          label: 'Notion REST Token (Managed by OAuth)',
                           placeholder: 'Connected via OAuth',
                           value: notionKey,
                           onChange: setNotionKey,
-                          desc: 'Use the Connections tab to connect Notion via OAuth.',
+                          desc: 'Use the Connections tab to connect Notion REST via OAuth.',
                           link: 'https://www.notion.so/my-integrations',
                           linkText: 'Manage integrations →',
+                          disabled: true,
+                        },
+                        {
+                          label: 'Notion MCP Token (Managed by OAuth)',
+                          placeholder: 'Connected via OAuth',
+                          value: (storeUser as any)?.notionMcpAccessToken || '',
+                          onChange: () => {},
+                          desc: 'Use the Connections tab to connect Notion MCP via OAuth.',
+                          link: 'https://developers.notion.com/guides/mcp/build-mcp-client',
+                          linkText: 'MCP docs â†’',
                           disabled: true,
                         },
                       ].map((field) => (
