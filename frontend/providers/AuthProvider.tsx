@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { authClient } from "@/lib/auth";
 import type { User, Session } from "better-auth/types";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useOrinStore } from "@/stores/useOrinStore";
 
 interface AuthContextType {
@@ -15,6 +15,7 @@ interface AuthContextType {
   loginWithGoogle: () => Promise<void>;
   loginWithGithub: () => Promise<void>;
   googleOneTap: () => Promise<void>;
+  refresh: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -22,6 +23,7 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
@@ -44,7 +46,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             name: currentUser.name || "User",
             avatar: currentUser.image || undefined,
             geminiKey: (currentUser as any).geminiKey,
-            notionToken: (currentUser as any).notionToken,
             notionRestAccessToken: (currentUser as any).notionRestAccessToken,
             notionMcpAccessToken: (currentUser as any).notionMcpAccessToken
           });
@@ -66,7 +67,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
     fetchSession();
-  }, [setOrinUser, pathname, router]);
+  }, [setOrinUser, pathname, searchParams, router]);
+
+  const refresh = async () => {
+    setLoading(true);
+    // Force direct call ignoring any potential client cache
+    const { data } = await authClient.getSession();
+    const currentUser = data?.user || null;
+    setUser(currentUser);
+    setSession(data?.session || null);
+    
+    if (currentUser) {
+       setOrinUser({
+        id: currentUser.id,
+        email: currentUser.email,
+        name: currentUser.name || "User",
+        avatar: currentUser.image || undefined,
+        geminiKey: (currentUser as any).geminiKey,
+        notionRestAccessToken: (currentUser as any).notionRestAccessToken,
+        notionMcpAccessToken: (currentUser as any).notionMcpAccessToken
+      });
+    }
+
+    setLoading(false);
+  };
 
   const logout = async () => {
     await authClient.signOut();
@@ -113,7 +137,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       logout, 
       loginWithGoogle, 
       loginWithGithub,
-      googleOneTap
+      googleOneTap,
+      refresh
     }}>
       {children}
     </AuthContext.Provider>
