@@ -17,7 +17,7 @@ export const checkNotionHealth = catchAsync(async (req: Request, res: Response) 
 
   try {
     const user = userId ? await db.user.findUnique({ where: { id: userId } }) as any : null;
-    const restToken = user?.notionRestAccessToken || user?.notionToken || envVars.NOTION_API_KEY || null;
+    const restToken = user?.notionRestAccessToken || envVars.NOTION_API_KEY || null;
     const mcpToken = user?.notionMcpAccessToken || envVars.NOTION_MCP_TOKEN || null;
 
     const restStatus = {

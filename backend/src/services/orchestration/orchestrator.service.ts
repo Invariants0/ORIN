@@ -1041,8 +1041,8 @@ ${resumeResult.nextSteps.map((step, i) => `${i + 1}. ${step}`).join('\n')}
   }> {
     logger.info('[Orchestrator] Executing workflow', { action, parameters, userId });
 
-    // Get Notion token from user (try REST first, then MCP, then legacy notionToken)
-    const notionToken = user?.notionRestAccessToken || user?.notionMcpAccessToken || user?.notionToken;
+    // Get Notion token from user (try REST first, then MCP)
+    const notionToken = user?.notionRestAccessToken || user?.notionMcpAccessToken;
 
     // Workflow execution logic
     const workflows: Record<string, () => Promise<any>> = {

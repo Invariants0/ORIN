@@ -357,7 +357,7 @@ class NotionWriteService {
 
   private async getUserNotionRestToken(userId: string): Promise<string | undefined> {
     const user = await db.user.findUnique({ where: { id: userId } });
-    return user?.notionRestAccessToken || user?.notionToken || envVars.NOTION_API_KEY;
+    return user?.notionRestAccessToken || envVars.NOTION_API_KEY;
   }
 
   /**

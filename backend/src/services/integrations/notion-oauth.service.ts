@@ -69,7 +69,6 @@ class NotionOauthService {
     await db.user.update({
       where: { id: userId },
       data: {
-        notionToken: tokens.access_token, // legacy field
         notionRestAccessToken: tokens.access_token,
         notionRestRefreshToken: tokens.refresh_token || null
       }
@@ -80,7 +79,6 @@ class NotionOauthService {
     await db.user.update({
       where: { id: userId },
       data: {
-        notionToken: null,
         notionRestAccessToken: null,
         notionRestRefreshToken: null
       }
@@ -89,7 +87,7 @@ class NotionOauthService {
 
   async getTokenForUser(userId: string): Promise<string | null> {
     const user = await db.user.findUnique({ where: { id: userId } });
-    return user?.notionRestAccessToken || user?.notionToken || null;
+    return user?.notionRestAccessToken || null;
   }
 }
 
