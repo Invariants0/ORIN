@@ -100,7 +100,7 @@ class IntentDetectionService {
     const input = userInput.toLowerCase().trim();
     
     // STORE intent patterns
-    const storeKeywords = ['save', 'store', 'remember', 'keep', 'note this', 'add this', 'record'];
+    const storeKeywords = ['save', 'store', 'remember', 'keep', 'note this', 'add this', 'record', 'dump'];
     if (storeKeywords.some(kw => input.startsWith(kw) || input.includes(kw + ' this') || input.includes(kw + ' that'))) {
       // Extract content (remove the command part)
       let content = userInput;
@@ -130,7 +130,7 @@ class IntentDetectionService {
     }
     
     // QUERY intent patterns
-    const queryStarters = ['what', 'find', 'search', 'tell me', 'show me', 'get', 'retrieve', 'where', 'when', 'who', 'how'];
+    const queryStarters = ['what', 'find', 'search', 'tell me', 'show me', 'get', 'retrieve', 'where', 'when', 'who', 'how', 'summarize', 'summary of', 'analyze', 'explain'];
     if (queryStarters.some(kw => input.startsWith(kw)) || input.includes('?')) {
       const question = userInput.trim();
       const searchTerms = question

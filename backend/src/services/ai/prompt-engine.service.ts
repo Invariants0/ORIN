@@ -33,7 +33,7 @@ class PromptEngineService {
   private genAI: GoogleGenerativeAI;
   private model: any;
   private readonly MAX_RETRIES = 1; // Reduced from 2 to minimize API usage
-  private readonly DEFAULT_TEMPERATURE = 0.7;
+  private readonly DEFAULT_TEMPERATURE = 0.2;
   
   // Response cache to prevent duplicate API calls
   private responseCache = new Map<string, { data: any; timestamp: number }>();
@@ -48,7 +48,8 @@ class PromptEngineService {
       generationConfig: {
         temperature: this.DEFAULT_TEMPERATURE,
         maxOutputTokens: 2048,
-        candidateCount: 1
+        candidateCount: 1,
+        responseMimeType: 'application/json'
       }
     });
   }
@@ -110,11 +111,12 @@ class PromptEngineService {
         if (config.apiKey) {
           const customGenAI = new GoogleGenerativeAI(config.apiKey);
           modelToUse = customGenAI.getGenerativeModel({
-            model: envVars.GEMINI_MODEL,
-            generationConfig: {
-              temperature: this.DEFAULT_TEMPERATURE,
+          model: envVars.GEMINI_MODEL,
+          generationConfig: {
+              temperature: config.temperature ?? this.DEFAULT_TEMPERATURE,
               maxOutputTokens: 2048,
-              candidateCount: 1
+              candidateCount: 1,
+              responseMimeType: 'application/json'
             }
           });
         }
@@ -282,23 +284,27 @@ class PromptEngineService {
    */
   private extractJSON(text: string): any {
     try {
-      // Remove markdown code blocks
       let cleaned = text.trim();
 
-      // Try to extract from ```json ... ``` or ``` ... ```
-      const jsonMatch = cleaned.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+      const jsonMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
       if (jsonMatch) {
         cleaned = jsonMatch[1];
       }
 
-      // Remove any leading/trailing whitespace
       cleaned = cleaned.trim();
+      const directParse = this.tryParseJSON(cleaned);
+      if (directParse !== null) {
+        return directParse;
+      }
 
-      // Parse JSON
-      const parsed = JSON.parse(cleaned);
+      const extracted = this.extractBalancedJSON(cleaned);
+      if (!extracted) {
+        throw new Error('No valid JSON object found in model response');
+      }
 
-      if (typeof parsed !== 'object' || parsed === null) {
-        throw new Error('Parsed result is not an object');
+      const parsed = this.tryParseJSON(extracted);
+      if (parsed === null) {
+        throw new Error('JSON Parse error: Unable to parse extracted JSON segment');
       }
 
       return parsed;
@@ -310,6 +316,83 @@ class PromptEngineService {
       });
       throw new Error(`Invalid JSON response: ${error.message}`);
     }
+  }
+
+  private tryParseJSON(text: string): any | null {
+    try {
+      const parsed = JSON.parse(text);
+      if (typeof parsed !== 'object' || parsed === null) {
+        return null;
+      }
+      return parsed;
+    } catch {
+      return null;
+    }
+  }
+
+  private extractBalancedJSON(text: string): string | null {
+    const objectStart = text.indexOf('{');
+    const arrayStart = text.indexOf('[');
+
+    let start = -1;
+    let openChar = '';
+    let closeChar = '';
+
+    if (objectStart !== -1 && (arrayStart === -1 || objectStart < arrayStart)) {
+      start = objectStart;
+      openChar = '{';
+      closeChar = '}';
+    } else if (arrayStart !== -1) {
+      start = arrayStart;
+      openChar = '[';
+      closeChar = ']';
+    }
+
+    if (start === -1) {
+      return null;
+    }
+
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+
+    for (let i = start; i < text.length; i++) {
+      const char = text[i];
+
+      if (inString) {
+        if (escaped) {
+          escaped = false;
+          continue;
+        }
+
+        if (char === '\\') {
+          escaped = true;
+          continue;
+        }
+
+        if (char === '"') {
+          inString = false;
+        }
+
+        continue;
+      }
+
+      if (char === '"') {
+        inString = true;
+        continue;
+      }
+
+      if (char === openChar) {
+        depth++;
+      } else if (char === closeChar) {
+        depth--;
+        if (depth === 0) {
+          return text.slice(start, i + 1);
+        }
+      }
+    }
+
+    return null;
   }
 
   /**
@@ -406,6 +489,9 @@ CRITICAL DISTINCTION:
 - "write a page" = OPERATE if referring to page in Notion, GENERATE_DOC if referring to content document
 - "create a blog post" = GENERATE_DOC (written content)
 - "create a document" = GENERATE_DOC (written content)
+- "summarize my page" = QUERY
+- "summarize my recent page" = QUERY
+- "analyze this page" = QUERY
 
 Focus on ACTION VERBS and OBJECT TYPES to disambiguate.`,
       userInput,

@@ -404,6 +404,22 @@ class AdaptiveService {
 
       const insights = await this.getLearningInsights(userId);
 
+      const hasRealHistory =
+        insights.averageActualTime > 0 ||
+        insights.commonDelays.length > 0 ||
+        !insights.recommendations.includes('Complete more tasks to generate insights');
+
+      if (!hasRealHistory) {
+        logger.info('[Adaptive] Skipping adaptive task generation due to insufficient historical data', {
+          userId
+        });
+
+        return {
+          suggestions: [],
+          improvements: []
+        };
+      }
+
       // Build context from historical data
       const historicalContext = `
 Historical Performance:
