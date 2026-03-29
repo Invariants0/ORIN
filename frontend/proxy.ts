@@ -14,12 +14,16 @@ export function proxy(req: NextRequest) {
   const requestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 
   // 🛡️ 2. Authentication Guard
-  const sessionToken = req.cookies.get("better-auth.session_token")?.value;
-  const protectedRoutes = ["/dashboard", "/workflows", "/agents", "/settings"];
+  // In production (HTTPS), Better Auth prefixes cookies with "__Secure-"
+  const sessionToken = 
+    req.cookies.get("better-auth.session_token")?.value || 
+    req.cookies.get("__Secure-better-auth.session_token")?.value;
+
+  const protectedRoutes = ["/dashboard", "/workflows", "/agents", "/settings", "/onboarding"];
   const isProtected = protectedRoutes.some((route) => pathname.startsWith(route));
 
   if (isProtected && !sessionToken) {
-    console.warn(`[Proxy] 🔒 Unauthorized access to ${pathname} (Request: ${requestId})`);
+    console.warn(`[Proxy] 🔒 Unauthorized access to ${pathname} (Request: reqId: ${requestId})`);
     const url = req.nextUrl.clone();
     url.pathname = "/auth";
     return NextResponse.redirect(url);
