@@ -25,5 +25,8 @@ EXPOSE 10000
 # Set environment to production
 ENV NODE_ENV=production
 
-# Start the application
-CMD ["bun", "run", "src/server.ts"]
+# Make startup script executable
+RUN chmod +x ./start.sh
+
+# Start the application using our script
+CMD ["./start.sh"]
