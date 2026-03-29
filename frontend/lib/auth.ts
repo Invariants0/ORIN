@@ -9,6 +9,7 @@ export const authClient = createAuthClient({
     oneTapClient({
       clientId: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "",
       autoSelect: true,
+      context: "signin", // Added to satisfy new Google FedCM requirements
     })
   ]
 });

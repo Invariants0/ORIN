@@ -10,7 +10,7 @@ import { WebSocketProvider } from "@/providers/websocket-provider";
 import { AuthProvider } from "@/providers/AuthProvider";
 import { Analytics } from "@vercel/analytics/next";
 
-const inter = Inter({subsets:['latin'],variable:'--font-sans'});
+const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
