@@ -47,13 +47,18 @@ function normalizeMessages(messages: ApiSession["messages"]): OrinMessage[] {
 }
 
 export function useChatSessions() {
-  const setSessions = useOrinStore((s) => s.setSessions);
+  const { setSessions, setLoading } = useOrinStore();
 
   const query = useQuery({
     queryKey: queryKeys.chat.sessions(),
     queryFn: () => ChatApi.getSessions(),
     staleTime: 10 * 1000,
   });
+
+  // Sync loading state to store for skeletons in sidebar
+  useEffect(() => {
+    setLoading("fetchingSessions", query.isFetching);
+  }, [query.isFetching, setLoading]);
 
   useEffect(() => {
     if (query.data) {
@@ -66,7 +71,7 @@ export function useChatSessions() {
 }
 
 export function useChatSessionMessages(sessionId: string | null) {
-  const setSessionMessages = useOrinStore((s) => s.setSessionMessages);
+  const { setSessionMessages, setLoading } = useOrinStore();
 
   const query = useQuery({
     queryKey: sessionId ? queryKeys.chat.session(sessionId) : queryKeys.chat.session("none"),
@@ -74,6 +79,11 @@ export function useChatSessionMessages(sessionId: string | null) {
     enabled: !!sessionId && !sessionId.startsWith("session-"),
     staleTime: 10 * 1000,
   });
+
+  // Sync loading state to store for skeletons
+  useEffect(() => {
+    setLoading("fetchingMessages", query.isFetching);
+  }, [query.isFetching, setLoading]);
 
   useEffect(() => {
     if (query.data && sessionId) {

@@ -6,6 +6,7 @@ import { queryKeys } from './queries/query-keys';
 import { useMetricsStore } from '@/stores/metrics.store';
 import { useAlertsStore } from '@/stores/alerts.store';
 import { useTimelineStore } from '@/stores/timeline.store';
+import { useOrinStore } from '@/stores/useOrinStore';
 
 interface VersionedMessage {
   version?: number;
@@ -145,6 +146,21 @@ export function useEnhancedWebSocket() {
     queryClient.invalidateQueries({ queryKey: queryKeys.alerts.all });
   }, [shouldProcessEvent, addAlert, queryClient]);
 
+  const handleChatProgress = useCallback((payload: { status: string, sessionId?: string }) => {
+    const { updateMessage, sessionMessages, currentSessionId } = useOrinStore.getState();
+    const sid = currentSessionId;
+    if (!sid) return;
+
+    const messages = sessionMessages[sid] || [];
+    const lastAssistantMsg = [...messages].reverse().find(m => m.role === 'assistant' && m.isStreaming);
+    
+    if (lastAssistantMsg) {
+      updateMessage(lastAssistantMsg.id, {
+        commandSteps: [{ label: payload.status, status: 'running' }]
+      });
+    }
+  }, []);
+
   const reconcileState = useCallback(async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: queryKeys.workflows.lists(), refetchType: 'active' }),
@@ -172,10 +188,11 @@ export function useEnhancedWebSocket() {
     const unsubWorkflowEvent = websocketClient.on('workflow_event', (message) => handleWorkflowEvent(message.event));
     const unsubMetrics = websocketClient.on('system_metrics', (message) => handleMetricsUpdate(message.metrics));
     const unsubAlert = websocketClient.on('alert', (message) => handleAlert(message.alert));
+    const unsubChatProgress = websocketClient.on('chat_progress', (message) => handleChatProgress(message));
 
     return () => {
       unsubConnected(); unsubDisconnected(); unsubWorkflowEvent();
-      unsubMetrics(); unsubAlert();
+      unsubMetrics(); unsubAlert(); unsubChatProgress();
       if (metricsFlushTimer.current) clearTimeout(metricsFlushTimer.current);
     };
   }, [handleWorkflowEvent, handleMetricsUpdate, handleAlert, reconcileState]);
