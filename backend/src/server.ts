@@ -3,6 +3,11 @@ import dotenv from "dotenv";
 // Load environment variables first
 dotenv.config();
 
+// Fix for BigInt serialization in JSON
+(BigInt.prototype as any).toJSON = function () {
+  return this.toString();
+};
+
 import app from "@/app.js";
 import db from "@/config/database.js";
 import envVars from "@/config/envVars.js";
@@ -22,6 +27,11 @@ async function startServer() {
       logger.info(`📍 Environment: ${envVars.NODE_ENV}`);
       logger.info(`🌐 Health check: http://localhost:${PORT}/api/health`);
     });
+
+    // Production-Grade Connection Hardening
+    server.timeout = 180000; // 3 minutes for deep AI operations
+    server.keepAliveTimeout = 70000; // Higher than proxy timeouts (60s)
+    server.headersTimeout = 71000;
 
     // Initialize WebSocket server
     websocketGateway.initialize(server);
@@ -80,4 +90,3 @@ async function startServer() {
 }
 
 startServer();
-
