@@ -1,259 +1,263 @@
-# ORIN - Context Operating System
+# 🧠 ORIN
 
-ORIN is an AI-powered system that transforms Notion into a structured, actionable memory layer and enables users to interact with it through a command-driven interface.
+### Context Operating System powered by **Notion MCP** + **Gemini AI**
 
-## 🚀 Features
+<div align="center">
 
-- **Super Memory**: Store any input into structured Notion pages
-- **Context Retrieval**: Answer queries using stored memory and connected sources
-- **Document Generation**: Convert chat or knowledge into structured Notion docs
-- **Resume Work**: Restore prior work state and continue seamlessly
-- **Command-Driven Interface**: Powerful commands like `/store`, `/analyze`, `/build`, `/continue`
-- **Dual Mode**: Explore (read-only) and Build (write-enabled) modes
+[![🚀 Live Demo](https://img.shields.io/badge/🚀%20LIVE%20DEMO-orin--delta.vercel.app-000000?style=for-the-badge&logo=vercel&logoColor=white&labelColor=000000)](https://orin-delta.vercel.app/?utm_source=github&utm_campaign=notion-challenge)
 
-## 📁 Project Structure
+[![🏆 Notion AI Challenge](https://img.shields.io/badge/🏆%20NOTION%20AI%20CHALLENGE-Major%20League%20Hacking-FF6B35?style=for-the-badge)](https://mlh.io)
+[![⭐ Status](https://img.shields.io/badge/⭐%20STATUS-ACTIVE%20SUBMISSION-blue?style=for-the-badge)]()
+[![📦 Repo Type](https://img.shields.io/badge/📦%20REPO%20TYPE-Monorepo-6f42c1?style=for-the-badge)]()
+[![⚖️ License](https://img.shields.io/badge/⚖️%20LICENSE-ISC-green?style=for-the-badge)]()
 
-```
-orin/
-├── backend/          # Express.js + TypeScript API
-│   ├── src/
-│   │   ├── config/   # Configuration (database, env, logger)
-│   │   ├── controllers/  # Business logic
-│   │   ├── handlers/     # Async wrappers and error handlers
-│   │   ├── middlewares/  # Cross-cutting concerns
-│   │   ├── routes/       # Route definitions
-│   │   ├── services/     # External service integrations
-│   │   └── utils/        # Utilities and helpers
-│   └── prisma/       # Database schema
-├── frontend/         # Next.js + TypeScript UI
-│   ├── app/          # App Router pages
-│   ├── components/   # React components
-│   └── lib/          # Utilities and API client
-└── docs/            # Documentation
-```
+</div>
+
+---
+
+## 🎯 The Problem
+
+Your work is scattered across multiple tools:
+- 💻 Code in an editor
+- 📝 Plans in docs
+- ✅ Tasks in messages
+- 📧 Email reminders
+- 📅 Calendar commitments
+
+**The Reality:** Most AI tools sit outside of all of it, just *guessing* what you actually want.
+
+**We know there's a better way:** When AI can use your context—and run across multiple tools you use every day—like Notion.
+
+---
+
+## 🚀 The Challenge
+
+**Notion is partnering with Major League Hacking to issue a challenge to hackers around the globe:**
+
+### Build the Most Impressive System Using Notion MCP
+
+✅ Can be across any field: engineering, sales, finance, etc.  
+✅ We want to see your **sick integrations**!  
+✅ Show us the workflow that makes you feel like you have **superpowers**
+
+🔗 **[Official Challenge Page](https://events.mlh.io/events/13841-the-notion-ai-challenge)**
+
+### 🎨 Judging Criteria
+- ⭐ **Originality & Creativity** — Unique ideas and execution
+- ⚙️ **Technical Complexity** — Sophisticated implementation
+- 🎯 **Use of Underlying Technology** — Deep Notion MCP integration
+
+---
+
+## 💡 What ORIN Is
+
+ORIN transforms Notion into a living memory layer and execution engine on top of natural conversation.
+
+### Core Features
+- 🎯 **Intent Understanding** — Parse natural language commands
+- 💾 **Context Memory** — Store and retrieve structured information  
+- 📋 **Task Decomposition** — Break goals into actionable steps
+- ⚡ **Workflow Execution** — Execute and monitor tasks in real time
+- 🔌 **Dual Notion Integration** — Notion REST API + Native Notion MCP (Model Context Protocol)
+
+### Why This Matters
+Most AI tools sit outside your workflow, blind to your context. ORIN changes that: When AI can directly access and manipulate your Notion workspace—reading pages, creating tasks, updating databases—you get superpowers. Your context is immediately available. Your workflows become ambient.
+
+---
+
+## 🌟 Live Experience
+
+### ✨ Try the Demo
+👉 **[Launch ORIN](https://orin-delta.vercel.app/?utm_source=github&utm_campaign=notion-challenge)**
+
+### 📸 What You Can Do
+1. **Chat with Intent** — Tell ORIN to "organize my project tasks"
+2. **Watch It Execute** — See AI decompose, plan, and execute in Notion
+3. **Track Workflows** — Monitor multi-step operations in real time
+4. **Iterate Seamlessly** — Resume, modify, and re-run workflows
+
+---
 
 ## 🛠️ Tech Stack
 
-### Backend
-- **Runtime**: Node.js with Bun
-- **Framework**: Express.js 5.x
-- **Language**: TypeScript (strict mode, ES2022 target)
-- **Database**: PostgreSQL via Prisma ORM 6.x
-- **AI Layer**: Google Gemini API
-- **Memory**: Notion API
-- **Logging**: Winston
-- **Validation**: Zod
+| Layer | Technologies |
+|-------|--------------|
+| **Frontend** | Next.js 16, React 19, TypeScript 5, Tailwind CSS v4, React Query, Zustand |
+| **Backend** | Express 5, TypeScript 5, Prisma ORM, Better Auth, Winston Logging, WebSocket |
+| **AI/Integration** | Google Gemini API, Notion REST OAuth, Notion MCP OAuth + Client |
+| **Deployment** | Vercel (frontend), Render-ready (backend), PostgreSQL |
 
-### Frontend
-- **Framework**: Next.js 16 (App Router)
-- **Language**: TypeScript
-- **Styling**: Tailwind CSS v4
-- **UI Components**: shadcn/ui (Radix primitives)
-- **Icons**: lucide-react
+---
 
-## 📦 Getting Started
+## 🏗️ System Flow
 
-### Prerequisites
-
-- [Bun](https://bun.sh/) installed
-- Node.js 20+
-- Notion account with API access
-- Google Gemini API key
-- PostgreSQL database (NeonDB recommended)
-
-### 1. Clone and Setup
-
-```bash
-cd ORIN
+```
+┌─────────────────────────────────────────────────────────────┐
+│  User Intent (Chat + Commands)                              │
+└────────────────┬────────────────────────────────────────────┘
+                 │
+┌────────────────▼────────────────────────────────────────────┐
+│  Frontend: Next.js App → BFF Proxy Router                    │
+└────────────────┬────────────────────────────────────────────┘
+                 │
+┌────────────────▼────────────────────────────────────────────┐
+│  Backend: Orchestrator                                       │
+│  (Intent Classifier, Task Decomposer, Executor)             │
+└────────────────┬────────────────────────────────────────────┘
+                 │
+    ┌────────────┼────────────┐
+    │            │            │
+┌───▼──┐   ┌────▼────┐   ┌──▼──────┐
+│ MCP  │   │ REST    │   │ Gemini  │
+│Notion│   │Notion   │   │  API    │
+└──────┘   └─────────┘   └─────────┘
+    │            │            │
+    └────┬───────┴────┬───────┘
+         │            │
+    ┌────▼────────────▼────┐
+    │ Prisma (PostgreSQL)  │
+    │ State Persistence    │
+    └──────────────────────┘
 ```
 
-### 2. Backend Setup
+For detailed technical architecture, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+- 🦅 Bun or Node.js 20+
+- 🔑 Google Gemini API key
+- 📚 Database (SQLite for local, PostgreSQL for production)
+- 🔗 Notion OAuth credentials (optional, for REST API)
+- 🤖 Notion MCP OAuth credentials (optional, for native MCP)
+
+### 1️⃣ Start Backend
 ```bash
 cd backend
 bun install
 bunx prisma generate
-```
-
-Create `.env` file in the backend directory:
-
-```env
-NODE_ENV=development
-PORT=8000
-DATABASE_URL="postgresql://user:password@host:5432/orin"
-
-# Authentication (optional for now)
-AUTH0_DOMAIN=
-AUTH0_CLIENT_ID=
-AUTH0_CLIENT_SECRET=
-
-# AI Services
-GEMINI_API_KEY=your-gemini-api-key
-
-# Notion Integration
-NOTION_API_KEY=your-notion-api-key
-NOTION_DATABASE_ID=your-notion-database-id
-
-# Security
-SESSION_SECRET=your-session-secret
-JWT_SECRET=your-jwt-secret
-
-# CORS
-FRONTEND_URL=http://localhost:3000
-```
-
-### 3. Frontend Setup
-
-```bash
-cd ../frontend
-bun install
-```
-
-Create `.env.local` file:
-
-```env
-NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
-NEXT_PUBLIC_AUTH_ENABLED=false
-```
-
-### 4. Run the Application
-
-**Terminal 1 - Backend:**
-```bash
-cd backend
 bun run dev
 ```
 
-Backend will run on `http://localhost:8000`
-
-**Terminal 2 - Frontend:**
+### 2️⃣ Start Frontend
 ```bash
 cd frontend
+bun install
 bun run dev
 ```
 
-Frontend will run on `http://localhost:3000`
-
-## 🎯 Usage
-
-### Commands
-
-Once the application is running, use these commands in the chat interface:
-
-- **`/store <content>`** - Save structured memory to Notion
-- **`/analyze <query>`** - Retrieve and analyze context from Notion
-- **`/build <topic>`** - Generate structured documents
-- **`/continue`** - Resume previous work
-
-### Modes
-
-- **Explore Mode** (Default): Read-only intelligence, answers questions using context
-- **Build Mode**: Active system operator, creates pages and structures in Notion
-
-## 📚 Notion Setup
-
-1. Create a Notion integration at [notion.so/my-integrations](https://www.notion.so/my-integrations)
-2. Copy your API key
-3. Create a database in Notion with these properties:
-   - Title (Title)
-   - Type (Select)
-   - Tags (Multi-select)
-   - Content (Rich text)
-   - Source (URL)
-4. Share the database with your integration
-5. Copy the database ID from the URL
-
-## 🔧 Development
-
-### Backend Scripts
-
-```bash
-# Development mode
-bun run dev
-
-# Production build
-bun run build
-
-# Database migrations
-bun run db:migrate
-
-# Seed database
-bun run seed
-```
-
-### Frontend Scripts
-
-```bash
-# Development mode
-bun run dev
-
-# Build for production
-bun run build
-
-# Start production server
-bun run start
-```
-
-## 🏗️ Architecture
-
-### Backend Patterns
-
-- **Layered Architecture**: Routes → Controllers → Services → Database
-- **Async Wrapper Pattern**: All controllers wrapped in `catchAsync`
-- **Custom Error Handling**: `APIError` class for standardized errors
-- **Environment Validation**: Zod schema validation at startup
-- **Module Aliases**: Use `@/` for src imports
-
-### Frontend Patterns
-
-- **Component-Driven**: Modular, reusable components
-- **Client-Side State**: LocalStorage for session persistence
-- **Command Parsing**: Client-side command detection
-- **Optimistic UI**: Instant feedback with async operations
-
-## 📖 API Endpoints
-
-### Health Check
-```
-GET /api/health
-```
-
-### Store Content
-```
-POST /api/v1/store
-Body: { "input": "content to store" }
-```
-
-### Retrieve Context
-```
-POST /api/v1/retrieve
-Body: { "query": "what did I save today?" }
-```
-
-### Generate Document
-```
-POST /api/v1/generate-doc
-Body: { "topic": "business plan", "context": "optional context" }
-```
-
-## 🚧 Roadmap
-
-- [ ] Auth0/Google OAuth integration
-- [ ] Real-time collaboration
-- [ ] Advanced document generation with Notion blocks
-- [ ] Email and Slack integration mocks
-- [ ] Session management with database persistence
-- [ ] Enhanced prompt engineering
-- [ ] Multi-database support in Notion
-
-## 📝 License
-
-ISC
-
-## 🙏 Acknowledgments
-
-Built following the backend design patterns from the Waitflow project and Vercel React best practices.
+### 3️⃣ Open App
+- 🎨 **Frontend:** http://localhost:3000
+- 💚 **Health Check:** http://localhost:8000/api/health
 
 ---
 
-**ORIN** - Turn Notion into your second brain 🧠
+## 📋 Environment Setup
+
+### Backend Minimum Requirements
+
+```env
+# Core
+NODE_ENV=development
+PORT=8000
+
+# Database
+DATABASE_URL=file:./dev.db
+
+# Authentication
+BETTER_AUTH_SECRET=your-secret-here
+BETTER_AUTH_URL=http://localhost:8000/api/auth
+
+# AI
+GEMINI_API_KEY=your-api-key
+
+# Frontend
+FRONTEND_URL=http://localhost:3000
+```
+
+### Frontend Minimum Requirements
+
+```env
+NEXT_PUBLIC_FRONTEND_URL=http://localhost:3000
+NEXT_PUBLIC_BACKEND_URL=http://localhost:8000
+NEXT_PUBLIC_WS_URL=ws://localhost:8000/ws
+```
+
+---
+
+## 📚 Project Structure
+
+```
+ORIN/
+├─ 🎨 frontend/          Next.js app, React components, WebSocket client
+├─ ⚙️  backend/           Express API, orchestrator, workflow runner
+├─ 📖 docs/              Architecture, integration, and design docs
+├─ 📋 ARCHITECTURE.md    Canonical system design document
+├─ 📝 CHANGES_SUMMARY.md Recent updates
+└─ ⚖️  LICENSE            ISC License
+```
+
+---
+
+## 📖 Documentation
+
+| Doc | Purpose |
+|-----|---------|
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Full system design, data flows, integration patterns |
+| [docs/QUICK_START.md](docs/QUICK_START.md) | Developer onboarding guide |
+| [docs/NOTION_INTEGRATION_IMPLEMENTATION_PLAN.md](docs/NOTION_INTEGRATION_IMPLEMENTATION_PLAN.md) | Notion REST + MCP implementation details |
+| [docs/ORIN–PRD.md](docs/ORIN–PRD.md) | Product requirements & vision |
+| [frontend/README.md](frontend/README.md) | Frontend architecture & setup |
+| [backend/README.md](backend/README.md) | Backend API routes & configuration |
+
+---
+
+## 🎪 Notion MCP Challenge Submission
+
+### ✅ Why ORIN Wins This Challenge
+
+1. **🎨 Originality & Creativity**
+   - First system to bridge Notion MCP + Gemini for ambient AI
+   - Dual-mode integration (REST + native MCP)
+   - Voice/chat + multi-step workflow execution
+
+2. **⚙️ Technical Complexity**
+   - BFF proxy pattern for secure API routing
+   - Real-time WebSocket event streaming
+   - Multi-agent task decomposition engine
+   - Gemini intent classification + context memory
+   - Notion MCP OAuth + native protocol client
+
+3. **🚀 Use of Underlying Technology**
+   - Deep Notion MCP integration (reading, writing, querying)
+   - Notion REST OAuth for fallback + interop
+   - Gemini for intent parsing and plan generation
+   - Full workspace context access for ambient awareness
+
+### 🏆 Judge's Takeaway
+
+ORIN shows what's possible when AI has **native access to your workspace**. No API rate limits, no guessing—just direct, ambient intelligence that evolves with your Notion setup.
+
+---
+
+## 🔗 Links
+
+- **🚀 [Live Demo](https://orin-delta.vercel.app/?utm_source=github&utm_campaign=notion-challenge)** — Try ORIN now
+- **💬 [GitHub Issues](https://github.com)** — Report bugs or request features
+- **📧 Challenge Info** — [Notion AI Challenge on MLH](https://mlh.io)
+- **👤 Built by:** Akshad J. for Major League Hacking
+
+---
+
+<div align="center">
+
+### 🌟 Made for the Notion AI Challenge
+
+**Submissions close March 29, 2026 at 11:59 PM PST**
+
+[🚀 LAUNCH DEMO](https://orin-delta.vercel.app/?utm_source=github&utm_campaign=notion-challenge) • [📖 READ DOCS](ARCHITECTURE.md) • [⭐ Star on GitHub](#)
+
+</div>
