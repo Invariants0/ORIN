@@ -67,6 +67,9 @@ if (envVars.NODE_ENV === "development") {
     const start = Date.now();
     res.on("finish", () => {
       const duration = Date.now() - start;
+      // 🔇 Silence the health check noise 
+      if (req.url === "/health") return;
+
       logger.info(`[HTTP] ${req.method} ${req.url} ${res.statusCode} - ${duration}ms`, {
         method: req.method,
         url: req.url,
