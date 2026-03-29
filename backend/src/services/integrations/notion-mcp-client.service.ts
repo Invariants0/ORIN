@@ -239,36 +239,32 @@ class NotionMcpClientService {
   }
 
   /**
-   * Call an MCP resource (e.g., list pages, create page)
+   * Execute any MCP tool
    */
-  async callResource(
+  async executeTool(
     userId: string,
-    resourceUri: string,
-    params?: Record<string, any>
+    toolName: string,
+    args: Record<string, any>
   ): Promise<any> {
     const client = await this.getAuthenticatedClient(userId);
 
     try {
-      logger.info("[Notion MCP] Calling resource", { 
+      logger.info("[Notion MCP] Executing tool", { 
         userId, 
-        resourceUri, 
-        params 
+        toolName, 
+        args: JSON.stringify(args).substring(0, 100) + '...'
       });
 
       const response = await client.callTool({
-        name: resourceUri || "mcp_notion_notion-create-pages",
-        arguments: params || {},
+        name: toolName,
+        arguments: args,
       });
 
-      logger.info("[Notion MCP] Resource call succeeded", { 
-        resourceUri, 
-        response 
-      });
       return response;
     } catch (error) {
-      logger.error("[Notion MCP] Resource call failed", { 
+      logger.error("[Notion MCP] Tool execution failed", { 
         userId, 
-        resourceUri, 
+        toolName, 
         error 
       });
       throw error;
@@ -289,9 +285,9 @@ class NotionMcpClientService {
     try {
       logger.info("[Notion MCP] Creating page", { userId, pageTitle });
 
-      // Call the mcp_notion_notion-create-pages tool
+      // Call the notion-create-pages tool
       const response = await client.callTool({
-        name: "mcp_notion_notion-create-pages",
+        name: "notion-create-pages",
         arguments: {
           pages: [
             {

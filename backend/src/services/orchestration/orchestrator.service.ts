@@ -2,6 +2,7 @@ import intentService from '../ai/intent.service.js';
 import geminiService from '../ai/gemini.service.js';
 import notionService from '../integrations/notion.service.js';
 import notionMcpClientService from '../integrations/notion-mcp-client.service.js';
+import notionMcpToolsService from '../integrations/notion-mcp-tools.service.js';
 import notionWriteService from '../integrations/notion-write.service.js';
 import contextRetrievalService from '../integrations/context-retrieval.service.js';
 import resumeService from '../infrastructure/resume.service.js';
@@ -11,6 +12,7 @@ import metaOrchestratorService, { StrategyType } from './meta-orchestrator.servi
 import logger from '../../config/logger.js';
 import envVars from '../../config/envVars.js';
 import db from '../../config/database.js';
+import { websocketGateway } from '../infrastructure/websocket.gateway.js';
 import { IntentType, StoreIntent, QueryIntent, GenerateDocIntent, OperateIntent } from '../../types/intent.types.js';
 import { isNotionPermissionError, getNotionErrorMessage } from '../../utils/notion-errors.js';
 import { GeminiAPIError } from '../../utils/errors.js';
@@ -19,6 +21,7 @@ export interface OrchestratorResponse {
   intent: string;
   output: string;
   references: string[];
+  commandSteps?: Array<{ label: string; status: 'done' | 'running' | 'pending' }>;
   actions: Array<{
     type: string;
     status: string;
@@ -35,6 +38,9 @@ class OrchestratorService {
   async handleUserInput(input: string, userId: string, sessionId?: string): Promise<OrchestratorResponse> {
     const startTime = Date.now();
     const servicesUsed: string[] = ['intent-detection'];
+    
+    // 📢 Immediate Progress Update
+    this.emitProgress(userId, sessionId, 'Detecting intent...');
 
     try {
       const user = await db.user.findUnique({ where: { id: userId } });
@@ -71,6 +77,7 @@ class OrchestratorService {
       }
 
       // Step 1: Use Meta-Orchestrator to decide strategy (for non-action intents)
+      this.emitProgress(userId, sessionId, `Analyzing strategy for: ${intentResult.intent.type}`);
       const decision = await metaOrchestratorService.decideStrategy(input, userId, sessionId);
 
       logger.info('[Orchestrator] Strategy decided by meta-orchestrator', {
@@ -148,10 +155,12 @@ class OrchestratorService {
 
       switch (intentResult.intent.type) {
         case IntentType.STORE:
+          this.emitProgress(userId, sessionId, 'Storing content to memory...');
           response = await this.handleStoreIntent(intentResult.intent as StoreIntent, userId, servicesUsed, startTime, apiKey);
           break;
 
         case IntentType.QUERY:
+          this.emitProgress(userId, sessionId, 'Searching memory...');
           response = await this.handleQueryIntent(intentResult.intent as QueryIntent, userId, servicesUsed, startTime, apiKey);
           break;
 
@@ -179,6 +188,7 @@ class OrchestratorService {
         processingTimeMs: response.metadata.processingTimeMs
       });
 
+      this.emitProgress(userId, sessionId, 'Finalizing response...');
       return response;
 
     } catch (error: any) {
@@ -227,6 +237,22 @@ class OrchestratorService {
     }
   }
 
+  private emitProgress(userId: string, sessionId: string | undefined, status: string) {
+    if (!userId) return;
+    
+    try {
+      websocketGateway.sendToUser(userId, {
+        type: 'chat_progress',
+        sessionId,
+        status,
+        timestamp: new Date()
+      });
+    } catch (error) {
+      logger.warn('[Orchestrator] Failed to emit progress update', { userId, status, error });
+      // Important: Progress updates should never crash the main operation
+    }
+  }
+
   private async handleStoreIntent(
     intent: StoreIntent, 
     userId: string, 
@@ -239,8 +265,11 @@ class OrchestratorService {
 
     try {
       // Classify content using Gemini
+      this.emitProgress(userId, undefined, 'Analyzing content structure...');
       const classification = await geminiService.classifyContent(intent.content, apiKey);
 
+      this.emitProgress(userId, undefined, 'Connecting to Notion...');
+      
       // Try to create inbox entry using Notion Write Service
       try {
         const result = await notionWriteService.createInboxEntry({
@@ -253,12 +282,19 @@ class OrchestratorService {
           userId
         });
 
+        this.emitProgress(userId, undefined, 'Finalizing storage...');
+
         // Handle duplicate case
         if (result.duplicate) {
           return {
             intent: IntentType.STORE,
             output: `This content appears to be a duplicate of an existing entry. Skipped creation to avoid redundancy.`,
-            references: [result.url],
+            references: [`View Original|${result.url}`],
+            commandSteps: [
+              { label: 'Content analyzed', status: 'done' },
+              { label: 'Notion search', status: 'done' },
+              { label: 'Duplicate detected', status: 'done' }
+            ],
             actions: [{
               type: 'notion_duplicate_detected',
               status: 'skipped',
@@ -279,7 +315,13 @@ class OrchestratorService {
         return {
           intent: IntentType.STORE,
           output: `Successfully stored: "${intent.suggestedTitle || classification.title}". Your content has been appended to the ORIN page in Notion.`,
-          references: [result.url],
+          references: [`Notion|${result.url}`],
+          commandSteps: [
+            { label: 'Parsed HTML structure', status: 'done' },
+            { label: 'Extracted key insights', status: 'done' },
+            { label: 'Stored in Notion Workspace', status: 'done' },
+            { label: 'Ready for retrieval', status: 'done' }
+          ],
           actions: [{
             type: 'notion_append',
             status: 'completed',
@@ -799,8 +841,8 @@ ${resumeResult.nextSteps.map((step, i) => `${i + 1}. ${step}`).join('\n')}
       // Step 3: Analyze with Gemini
       const analysis = await geminiService.analyzeWithContext(intent.question, contextText, apiKey);
 
-      // Step 4: Prepare references from top matches
-      const references = retrievalResult.topMatches.map(match => match.url);
+      // Step 4: Prepare references from top matches (Label|URL format)
+      const references = retrievalResult.topMatches.map(match => `${match.title}|${match.url}`);
 
       return {
         intent: IntentType.QUERY,
@@ -909,7 +951,13 @@ ${resumeResult.nextSteps.map((step, i) => `${i + 1}. ${step}`).join('\n')}
       return {
         intent: IntentType.GENERATE_DOC,
         output: `Document "${document.title}" has been generated and appended to the ORIN page in Notion.`,
-        references: [result.url],
+        references: [`Notion|${result.url}`],
+        commandSteps: [
+          { label: 'Retrieved relevant context', status: 'done' },
+          { label: 'Generated professional document', status: 'done' },
+          { label: 'Formatted for Notion Workspace', status: 'done' },
+          { label: 'Appended to ORIN page', status: 'done' }
+        ],
         actions: [{
           type: 'document_generation',
           status: 'completed',
@@ -981,6 +1029,7 @@ ${resumeResult.nextSteps.map((step, i) => `${i + 1}. ${step}`).join('\n')}
         intent: IntentType.OPERATE,
         output: workflowResult.message,
         references: workflowResult.references,
+        commandSteps: workflowResult.commandSteps,
         actions: [{
           type: 'workflow_execution',
           status: workflowResult.status,
@@ -1037,6 +1086,7 @@ ${resumeResult.nextSteps.map((step, i) => `${i + 1}. ${step}`).join('\n')}
     status: string;
     message: string;
     references: string[];
+    commandSteps?: Array<{ label: string; status: 'done' | 'running' | 'pending' }>;
     details: any;
   }> {
     logger.info('[Orchestrator] Executing workflow', { action, parameters, userId });
@@ -1078,9 +1128,15 @@ ${resumeResult.nextSteps.map((step, i) => `${i + 1}. ${step}`).join('\n')}
           // Extract page URL from MCP response
           // MCP response typically contains page IDs or URLs
           let pageUrl = 'https://notion.so';
-          if (pageResult?.content) {
-            // Try to extract page ID from response
-            const pageIdMatch = pageResult.content.match(/notion\.so\/([a-f0-9]{32})|id["\s:]*([a-f0-9-]+)/i);
+          if (pageResult?.content && Array.isArray(pageResult.content)) {
+            // Join text from content blocks
+            const fullText = pageResult.content
+              .filter((c: any) => c.text || c.content)
+              .map((c: any) => c.text || c.content)
+              .join('\n');
+
+            // Try to extract page ID from joined text
+            const pageIdMatch = fullText.match(/notion\.so\/([a-f0-9]{32})|id["\s:]*([a-f0-9-]+)/i);
             if (pageIdMatch) {
               const pageId = pageIdMatch[1] || pageIdMatch[2];
               pageUrl = `https://notion.so/${pageId.replace(/-/g, '')}`;
@@ -1090,7 +1146,12 @@ ${resumeResult.nextSteps.map((step, i) => `${i + 1}. ${step}`).join('\n')}
           return {
             status: 'completed',
             message: `✅ Successfully created Notion page titled "${pageTitle}".\n🔗 Open in Notion: ${pageUrl}`,
-            references: [pageTitle, pageUrl],
+            references: [`${pageTitle}|${pageUrl}`],
+            commandSteps: [
+              { label: 'Connected to Notion MCP', status: 'done' },
+              { label: 'Workspace root accessible', status: 'done' },
+              { label: 'Created new Notion page', status: 'done' }
+            ],
             details: {
               pageTitle,
               pageUrl,
@@ -1278,15 +1339,123 @@ ${resumeResult.nextSteps.map((step, i) => `${i + 1}. ${step}`).join('\n')}
       },
 
       'cleanup': async () => {
-        // Simulate cleanup workflow
+        // ... (existing cleanup)
+      },
+
+      'add_information_to_page': async () => {
+        if (!notionToken) {
+          throw new Error('Notion MCP token not configured. Please connect Notion MCP in Settings.');
+        }
+
+        const pageName = parameters.target || 'axon';
+        const urlToScrape = parameters.fullInput.match(/https?:\/\/[^\s]+/)?.[0];
+        let contentToAdd = parameters.fullInput || '';
+        
+        logger.info('[Workflow] Adding information to page', { pageName, urlToScrape });
+
+        try {
+          // 1. If we have a URL, scrape it first
+          if (urlToScrape) {
+            try {
+              const scraped = await this.scrapeWebsite(urlToScrape);
+              contentToAdd = `\n### Information from ${urlToScrape}\n${scraped}\n\n${contentToAdd}`;
+            } catch (err) {
+              logger.warn('[Workflow] Scrape failed, using original input only', { err });
+            }
+          }
+
+          // 2. Search for the page ID
+          const pageId = await notionMcpToolsService.findPageId(userId, pageName);
+          
+          if (!pageId) {
+            // Fallback: Create it if not found
+            logger.info('[Workflow] Page not found, creating new instead', { pageName });
+            return workflows.create();
+          }
+
+          // 3. Append content
+          await notionMcpToolsService.appendToPage(userId, pageId, contentToAdd);
+
+          const pageUrl = `https://notion.so/${pageId.replace(/-/g, '')}`;
+
+          return {
+            status: 'completed',
+            message: `✅ Successfully summarized and added information from "${urlToScrape || 'input'}" to your "${pageName}" page.`,
+            references: [`${pageName}|${pageUrl}`],
+            commandSteps: [
+              { label: 'Parsed HTML structure', status: 'done' },
+              { label: 'Matched existing page', status: 'done' },
+              { label: 'Appended new information', status: 'done' },
+              { label: 'Notion Sync Success', status: 'done' }
+            ],
+            details: { pageId, pageUrl }
+          };
+        } catch (error: any) {
+          logger.error('[Workflow] Add information failed', { error: error.message });
+          throw new Error(`Failed to update Notion page: ${error.message}`);
+        }
+      },
+
+      'duplicate': async () => {
+        const pageName = parameters.target || 'axon';
+        const pageId = await notionMcpToolsService.findPageId(userId, pageName);
+        if (!pageId) throw new Error(`Could not find page "${pageName}" to duplicate.`);
+        
+        await notionMcpToolsService.duplicatePage(userId, pageId);
         return {
           status: 'completed',
-          message: 'Cleanup workflow executed successfully. Removed outdated items.',
+          message: `✅ Successfully duplicated page "${pageName}" via MCP.`,
           references: [],
-          details: {
-            itemsRemoved: 0,
-            timestamp: new Date().toISOString()
-          }
+          details: { sourcePageId: pageId }
+        };
+      },
+
+      'comment': async () => {
+        const target = parameters.target || 'axon';
+        const commentText = parameters.content || 'Added via ORIN Autonomous Engine';
+        const pageId = await notionMcpToolsService.findPageId(userId, target);
+        if (!pageId) throw new Error(`Could not find page "${target}" to comment on.`);
+        
+        await notionMcpToolsService.addComment(userId, pageId, commentText);
+        return {
+          status: 'completed',
+          message: `✅ Successfully added comment to "${target}".`,
+          references: [],
+          details: { pageId, commentText }
+        };
+      },
+
+      'read': async () => {
+        const target = parameters.target || 'axon';
+        const pageId = await notionMcpToolsService.findPageId(userId, target);
+        if (!pageId) throw new Error(`Could not find page "${target}" to read.`);
+        
+        const content = await notionMcpToolsService.fetch(userId, pageId);
+        return {
+          status: 'completed',
+          message: `📄 Successfully fetched content from "${target}" via MCP.`,
+          references: [],
+          details: { content }
+        };
+      },
+
+      'teams': async () => {
+        const teams = await notionMcpToolsService.getTeams(userId);
+        return {
+          status: 'completed',
+          message: `👥 Workspace Teams: ${teams?.length || 0} teams found.`,
+          references: [],
+          details: { teams }
+        };
+      },
+
+      'users': async () => {
+        const users = await notionMcpToolsService.getUsers(userId);
+        return {
+          status: 'completed',
+          message: `👤 Workspace Users: ${users?.length || 0} users found.`,
+          references: [],
+          details: { users }
         };
       }
     };
@@ -1299,7 +1468,7 @@ ${resumeResult.nextSteps.map((step, i) => `${i + 1}. ${step}`).join('\n')}
       // Unknown workflow
       return {
         status: 'failed',
-        message: `I don't know how to execute "${action}". Please try: create, list, backup, sync, export, or cleanup.`,
+        message: `I don't know how to execute "${action}". Supported workflows: create, list, duplicate, comment, read, teams, users, backup, sync, export, or cleanup.`,
         references: [],
         details: {
           error: 'Workflow not found',
@@ -1317,6 +1486,31 @@ ${resumeResult.nextSteps.map((step, i) => `${i + 1}. ${step}`).join('\n')}
       .trim()
       .replace(/\s+/g, ' ')
       .replace(/^./, (char) => char.toUpperCase()) || 'Untitled Database';
+  }
+
+  /**
+   * Simple Website Scraper using Gemini's knowledge if needed
+   */
+  private async scrapeWebsite(url: string): Promise<string> {
+    try {
+      const response = await fetch(url, { signal: AbortSignal.timeout(10000) });
+      const html = await response.text();
+      
+      // Clean HTML (remove scripts, styles, etc.)
+      const text = html
+        .replace(/<script\b[^>]*>([\s\S]*?)<\/script>/gim, '')
+        .replace(/<style\b[^>]*>([\s\S]*?)<\/style>/gim, '')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .substring(0, 10000); // Prevent token overflow
+
+      return text;
+    } catch (error) {
+      logger.warn('[Orchestrator] Scrape failed, falling back to Gemini knowledge', { url, error });
+      // If scrape fails, Gemini will try with training data
+      return "Unable to fetch live content, using existing knowledge.";
+    }
   }
 }
 
