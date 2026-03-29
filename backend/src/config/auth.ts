@@ -9,7 +9,7 @@ export const auth = betterAuth({
   trustedOrigins: [process.env.FRONTEND_URL || "http://localhost:3000"],
 
   advanced: {
-    useSecureCookies: false, // Ensure cookies are sent over HTTP on localhost
+    useSecureCookies: process.env.NODE_ENV === "production", 
   },
 
   database: prismaAdapter(db, {

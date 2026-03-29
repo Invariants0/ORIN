@@ -79,9 +79,16 @@ if (envVars.NODE_ENV === "development") {
   });
 }
 
+// Redirect root to health
+app.get("/", (_req, res) => res.redirect("/health"));
+
 // Health check for Render / Environment
-app.get("/health", (req, res) => {
-  res.status(200).json({ status: "healthy", timestamp: new Date().toISOString() });
+app.get("/health", (_req, res) => {
+  res.status(200).json({ 
+    status: "healthy", 
+    service: "orin-backend",
+    timestamp: new Date().toISOString() 
+  });
 });
 
 // Register routes
