@@ -95,17 +95,26 @@ export const OrinChatMessage = ({ message }: Props) => {
 
         {/* References */}
         {message.references && message.references.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {message.references.map((ref, i) => (
-              <BrandBadge
-                key={i}
-                variant="sage"
-                className="flex items-center gap-1.5 py-1 px-3 cursor-pointer hover:bg-black hover:text-white transition-all text-[10px]"
-              >
-                <ExternalLink className="w-3 h-3" />
-                {ref}
-              </BrandBadge>
-            ))}
+          <div className="flex flex-wrap gap-2 pt-1">
+            {message.references.map((ref, i) => {
+              const [label, url] = ref.includes('|') ? ref.split('|') : [ref, ref];
+              const isUrl = url.startsWith('http');
+              
+              return (
+                <BrandBadge
+                  key={i}
+                  variant="sage"
+                  onClick={() => isUrl && window.open(url, '_blank')}
+                  className={cn(
+                    "flex items-center gap-1.5 py-1 px-3 transition-all text-[10px] rounded-full border-2 border-black font-bold",
+                    isUrl ? "cursor-pointer hover:bg-[#ffe17c] hover:shadow-[2px_2px_0px_0px_#000]" : "opacity-50"
+                  )}
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  {label}
+                </BrandBadge>
+              );
+            })}
           </div>
         )}
 
@@ -144,18 +153,28 @@ export const OrinChatMessage = ({ message }: Props) => {
           {message.content}
         </div>
 
+        {/* References */}
         {!isUser && message.references && message.references.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {message.references.map((ref, i) => (
-              <BrandBadge
-                key={i}
-                variant="sage"
-                className="flex items-center gap-1.5 py-1 px-3 cursor-pointer hover:bg-black hover:text-white transition-all text-[10px]"
-              >
-                <ExternalLink className="w-3 h-3" />
-                {ref}
-              </BrandBadge>
-            ))}
+          <div className="flex flex-wrap gap-2 pt-1">
+            {message.references.map((ref, i) => {
+              const [label, url] = ref.includes('|') ? ref.split('|') : [ref, ref];
+              const isUrl = url.startsWith('http');
+              
+              return (
+                <BrandBadge
+                  key={i}
+                  variant="sage"
+                  onClick={() => isUrl && window.open(url, '_blank')}
+                  className={cn(
+                    "flex items-center gap-1.5 py-1 px-3 transition-all text-[10px] rounded-full border-2 border-black font-bold",
+                    isUrl ? "cursor-pointer hover:bg-[#ffe17c] hover:shadow-[2px_2px_0px_0px_#000]" : "opacity-50"
+                  )}
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  {label}
+                </BrandBadge>
+              );
+            })}
           </div>
         )}
 

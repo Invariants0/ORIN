@@ -36,6 +36,9 @@ export const OrinChatWindow = ({ onSuggestionClick }: OrinChatWindowProps) => {
   const messages = getMessages();
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // We check if the store is empty but we know we're supposed to have messages (fetching state)
+  const isInitialLoading = !messages.length && loadingStates.fetchingMessages;
+
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -43,6 +46,24 @@ export const OrinChatWindow = ({ onSuggestionClick }: OrinChatWindowProps) => {
   }, [messages, loadingStates.sendingMessage, currentSessionId]);
 
   const suggestions = SUGGESTIONS[mode] ?? SUGGESTIONS.explore;
+
+  // 🦴 SKELETON LOADER FOR PREMIUM FEEL
+  if (isInitialLoading) {
+    return (
+      <div className="max-w-4xl mx-auto h-full px-8 pt-10 space-y-10">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className={`flex gap-6 ${i % 2 === 0 ? 'flex-row-reverse' : ''} animate-pulse`}>
+            <div className="w-10 h-10 bg-neutral-200 border-2 border-dashed border-black/20 flex-shrink-0" />
+            <div className={`p-6 rounded-2xl border-2 border-dashed border-black/10 w-full max-w-sm space-y-3`}>
+              <div className="h-4 bg-neutral-100 rounded w-3/4" />
+              <div className="h-4 bg-neutral-100 rounded w-full" />
+              <div className="h-4 bg-neutral-100 rounded w-1/2" />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div ref={scrollRef} className="h-full overflow-y-auto px-8 pt-8 pb-44 space-y-6">
