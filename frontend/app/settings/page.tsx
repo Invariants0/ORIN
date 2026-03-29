@@ -93,7 +93,6 @@ export default function SettingsPage() {
         const { error } = await authClient.updateUser({
           geminiKey: geminiKey,
           notionRestAccessToken: notionKey,
-          notionToken: notionKey,
         } as any);
 
         if (error) throw error;
@@ -103,7 +102,6 @@ export default function SettingsPage() {
             ...storeUser,
             geminiKey: geminiKey,
             notionRestAccessToken: notionKey,
-            notionToken: notionKey,
           });
         }
       }
@@ -131,9 +129,9 @@ export default function SettingsPage() {
         method: 'POST',
         credentials: 'include',
       });
-      await authClient.updateUser({ notionRestAccessToken: '', notionToken: '' } as any);
+      await authClient.updateUser({ notionRestAccessToken: '' } as any);
       if (storeUser) {
-        setStoreUser({ ...storeUser, notionRestAccessToken: '', notionToken: '' });
+        setStoreUser({ ...storeUser, notionRestAccessToken: '' });
       }
       setNotionKey('');
       toast.success('Notion disconnected', {

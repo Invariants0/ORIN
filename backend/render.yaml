@@ -19,7 +19,7 @@ services:
       - key: BETTER_AUTH_URL
         sync: false # Set to https://backend-url/api/auth
       - key: GEMINI_API_KEY
-        sync: false
+        sync: true
       - key: NOTION_OAUTH_CLIENT_ID
         sync: false
       - key: NOTION_OAUTH_CLIENT_SECRET
