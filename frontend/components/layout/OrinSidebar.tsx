@@ -33,12 +33,15 @@ export const OrinSidebar = () => {
     newSession,
     removeSession,
     isAccountOpen,
-    setIsAccountOpen 
+    setIsAccountOpen,
+    loadingStates
   } = useOrinStore();
   const { user } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const queryClient = useQueryClient();
+
+  const isSyncingSessions = loadingStates.fetchingSessions && sessions.length === 0;
 
   const deleteMutation = useMutation({
     mutationFn: (sessionId: string) => ChatApi.deleteSession(sessionId),
@@ -56,7 +59,11 @@ export const OrinSidebar = () => {
   });
 
   const openSession = (id: string) => {
-    setCurrentSessionId(id);
+    if (id !== currentSessionId) {
+      // Force loading state so skeletons show up instantly
+      useOrinStore.getState().setLoading('fetchingMessages', true);
+      setCurrentSessionId(id);
+    }
     if (pathname !== '/dashboard') router.push('/dashboard');
   };
 
@@ -101,7 +108,13 @@ export const OrinSidebar = () => {
           <History className="w-3 h-3 text-[#b7c6c2]/40" />
         </div>
 
-        {sessions.length === 0 ? (
+        {isSyncingSessions ? (
+          Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="w-full px-3 py-2.5 rounded-lg animate-pulse">
+              <div className="h-4 bg-white/5 rounded-md w-full" />
+            </div>
+          ))
+        ) : sessions.length === 0 ? (
           <div className="py-8 text-center opacity-30">
             <MessageSquare className="w-6 h-6 mx-auto mb-2" />
             <p className="text-xs font-bold font-mono uppercase tracking-widest">No sessions yet</p>
@@ -125,11 +138,11 @@ export const OrinSidebar = () => {
                   className="flex items-center gap-2.5 flex-1 min-w-0 text-left"
                 >
                   <div
-                  className={cn(
-                    'w-1.5 h-1.5 rounded-full flex-shrink-0',
-                    isActive ? 'bg-[#ffe17c]' : 'bg-white/20'
-                  )}
-                />
+                    className={cn(
+                      'w-1.5 h-1.5 rounded-full flex-shrink-0',
+                      isActive ? 'bg-[#ffe17c]' : 'bg-white/20'
+                    )}
+                  />
                   <span className="text-xs font-bold truncate flex-1">{session.title}</span>
                 </button>
                 <button

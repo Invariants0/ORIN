@@ -51,7 +51,11 @@ interface OrinState {
   currentSessionId: string | null;
   sessionMessages: Record<string, OrinMessage[]>;
   connections: OrinConnections;
-  loadingStates: { sendingMessage: boolean };
+  loadingStates: { 
+    sendingMessage: boolean;
+    fetchingMessages: boolean;
+    fetchingSessions: boolean;
+  };
   isAccountOpen: boolean;
 }
 
@@ -81,7 +85,11 @@ export const useOrinStore = create<OrinState & OrinActions>((set, get) => ({
   currentSessionId: null,  // set after sessions load
   sessionMessages: {},     // populated on session select
   connections: { notion: false, email: false, slack: false },
-  loadingStates: { sendingMessage: false },
+  loadingStates: { 
+    sendingMessage: false,
+    fetchingMessages: false,
+    fetchingSessions: false
+  },
   isAccountOpen: false,
 
   // ── Actions ────────────────────────────────────────────────────────────
