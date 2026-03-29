@@ -79,6 +79,11 @@ if (envVars.NODE_ENV === "development") {
   });
 }
 
+// Health check for Render / Environment
+app.get("/health", (req, res) => {
+  res.status(200).json({ status: "healthy", timestamp: new Date().toISOString() });
+});
+
 // Register routes
 app.use("/api", rootRouter);
 

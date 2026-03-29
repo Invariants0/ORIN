@@ -25,8 +25,5 @@ EXPOSE 10000
 # Set environment to production
 ENV NODE_ENV=production
 
-# Make startup script executable
-RUN chmod +x ./start.sh
-
-# Start the application using our script
-CMD ["./start.sh"]
+# Start the application with inline schema synchronization
+CMD ["sh", "-c", "bun run db:push && bun run src/server.ts"]
