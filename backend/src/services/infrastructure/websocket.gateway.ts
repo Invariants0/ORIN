@@ -13,6 +13,7 @@ interface Client {
 class WebSocketGateway {
   private wss: WebSocketServer | null = null;
   private clients: Map<string, Client> = new Map();
+  private userIdToClientIds: Map<string, Set<string>> = new Map();
   private heartbeatInterval: NodeJS.Timeout | null = null;
 
   /**
@@ -127,6 +128,18 @@ class WebSocketGateway {
    */
   private handleDisconnect(client: Client) {
     this.clients.delete(client.id);
+    
+    // Cleanup userId mapping
+    if (client.userId) {
+      const clientIds = this.userIdToClientIds.get(client.userId);
+      if (clientIds) {
+        clientIds.delete(client.id);
+        if (clientIds.size === 0) {
+          this.userIdToClientIds.delete(client.userId);
+        }
+      }
+    }
+    
     logger.info('WebSocket client disconnected', {
       clientId: client.id,
       totalClients: this.clients.size
@@ -192,6 +205,11 @@ class WebSocketGateway {
   private handleAuthenticate(client: Client, userId: string) {
     client.userId = userId;
 
+    if (!this.userIdToClientIds.has(userId)) {
+      this.userIdToClientIds.set(userId, new Set());
+    }
+    this.userIdToClientIds.get(userId)!.add(client.id);
+
     this.sendToClient(client, {
       type: 'authenticated',
       userId,
@@ -199,6 +217,21 @@ class WebSocketGateway {
     });
 
     logger.info('Client authenticated', { clientId: client.id, userId });
+  }
+
+  /**
+   * Send message to all connections for a specific user
+   */
+  sendToUser(userId: string, message: any) {
+    const clientIds = this.userIdToClientIds.get(userId);
+    if (!clientIds) return;
+
+    for (const clientId of clientIds) {
+      const client = this.clients.get(clientId);
+      if (client) {
+        this.sendToClient(client, message);
+      }
+    }
   }
 
   /**
@@ -278,11 +311,10 @@ class WebSocketGateway {
           this.clients.delete(client.id);
           continue;
         }
-
         (client.ws as any).isAlive = false;
         client.ws.ping();
       }
-    }, 30000); // 30 seconds
+    }, 15000); // 15 seconds (Production Standard for Keeping Proxies Alive)
   }
 
   /**
