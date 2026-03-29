@@ -8,6 +8,7 @@ import { Toaster } from "@/components/core/ui/sonner";
 import { QueryProvider } from "@/providers/query-provider";
 import { WebSocketProvider } from "@/providers/websocket-provider";
 import { AuthProvider } from "@/providers/AuthProvider";
+import { Analytics } from "@vercel/analytics/next";
 
 const inter = Inter({subsets:['latin'],variable:'--font-sans'});
 
@@ -50,6 +51,7 @@ export default function RootLayout({
             </QueryProvider>
           </AuthProvider>
         </Suspense>
+        <Analytics />
       </body>
     </html>
   );
