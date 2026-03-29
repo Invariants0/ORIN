@@ -1,9 +1,7 @@
 import logger from '@/config/logger.js';
 import sessionService from '@/services/infrastructure/session.service.js';
 import taskService from '@/services/workflow/task.service.js';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import db from '@/config/database.js';
 
 export enum StrategyType {
   EXECUTE = 'execute',
@@ -326,7 +324,7 @@ class MetaOrchestratorService {
 
       // TODO: Uncomment after migration
       /*
-      await prisma.decisionMetrics.create({
+      await db.decisionMetrics.create({
         data: {
           userId: context.userId,
           sessionId: context.sessionId,
@@ -367,7 +365,7 @@ class MetaOrchestratorService {
 
       // TODO: Uncomment after migration
       /*
-      const decision = await prisma.decisionMetrics.findFirst({
+      const decision = await db.decisionMetrics.findFirst({
         where: {
           userId,
           sessionId: sessionId || undefined
@@ -378,7 +376,7 @@ class MetaOrchestratorService {
       });
 
       if (decision) {
-        await prisma.decisionMetrics.update({
+        await db.decisionMetrics.update({
           where: { id: decision.id },
           data: {
             success,
@@ -407,7 +405,7 @@ class MetaOrchestratorService {
     try {
       // TODO: Uncomment after migration
       /*
-      const decisions = await prisma.decisionMetrics.findMany({
+      const decisions = await db.decisionMetrics.findMany({
         where: { userId }
       });
       */

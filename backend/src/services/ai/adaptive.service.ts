@@ -1,9 +1,7 @@
-import { PrismaClient } from '@prisma/client';
+import db from '@/config/database.js';
 import logger from "@/config/logger.js";
 import promptEngineService from "@/services/ai/prompt-engine.service.js";
 import { TaskItem } from "@/services/workflow/task.service.js";
-
-const prisma = new PrismaClient();
 
 export interface TaskMetricsData {
   taskId: string;
@@ -36,7 +34,7 @@ class AdaptiveService {
     try {
       logger.info('[Adaptive] Tracking task start', { taskId, estimatedTime });
 
-      await prisma.taskMetrics.create({
+      await db.taskMetrics.create({
         data: {
           taskId,
           estimatedTime,
@@ -66,7 +64,7 @@ class AdaptiveService {
     try {
       logger.info('[Adaptive] Tracking task completion', { taskId, success });
 
-      const metrics = await prisma.taskMetrics.findUnique({
+      const metrics = await db.taskMetrics.findUnique({
         where: { taskId }
       });
 
@@ -80,7 +78,7 @@ class AdaptiveService {
         ? Math.round((completedAt.getTime() - metrics.startedAt.getTime()) / 60000) // minutes
         : null;
 
-      await prisma.taskMetrics.update({
+      await db.taskMetrics.update({
         where: { taskId },
         data: {
           completedAt,
@@ -112,7 +110,7 @@ class AdaptiveService {
       logger.debug('[Adaptive] Getting learning insights', { userId });
 
       // Get all completed tasks with metrics for user
-      const tasks = await prisma.task.findMany({
+      const tasks = await db.task.findMany({
         where: {
           userId,
           status: 'done'
@@ -302,7 +300,7 @@ class AdaptiveService {
       const adjustments: PriorityAdjustment[] = [];
 
       // Get historical task data
-      const historicalTasks = await prisma.task.findMany({
+      const historicalTasks = await db.task.findMany({
         where: { userId },
         include: { metrics: true }
       });
@@ -491,7 +489,7 @@ Guidelines:
    */
   async getTaskMetrics(taskId: string): Promise<TaskMetricsData | null> {
     try {
-      const metrics = await prisma.taskMetrics.findUnique({
+      const metrics = await db.taskMetrics.findUnique({
         where: { taskId }
       });
 
@@ -520,7 +518,7 @@ Guidelines:
    */
   async getUserMetrics(userId: string): Promise<TaskMetricsData[]> {
     try {
-      const tasks = await prisma.task.findMany({
+      const tasks = await db.task.findMany({
         where: { userId },
         include: { metrics: true }
       });

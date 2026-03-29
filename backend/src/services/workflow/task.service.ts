@@ -1,9 +1,7 @@
-import { PrismaClient } from '@prisma/client';
+import db from '@/config/database.js';
 import logger from '@/config/logger.js';
 import promptEngineService from '@/services/ai/prompt-engine.service.js';
 import adaptiveService from '@/services/ai/adaptive.service.js';
-
-const prisma = new PrismaClient();
 
 export interface DecomposeTaskInput {
   input: string;
@@ -238,9 +236,9 @@ Example task structure:
   }): Promise<void> {
     try {
       // Create all tasks in a transaction
-      await prisma.$transaction(
+      await db.$transaction(
         input.tasks.map((task, index) =>
-          prisma.task.create({
+          db.task.create({
             data: {
               sessionId: input.sessionId,
               userId: input.userId,
@@ -276,7 +274,7 @@ Example task structure:
     try {
       logger.debug('[Task] Fetching session tasks', { sessionId });
 
-      const tasks = await prisma.task.findMany({
+      const tasks = await db.task.findMany({
         where: { sessionId },
         orderBy: { order: 'asc' }
       });
@@ -304,7 +302,7 @@ Example task structure:
     try {
       logger.debug('[Task] Fetching user tasks', { userId, status });
 
-      const tasks = await prisma.task.findMany({
+      const tasks = await db.task.findMany({
         where: {
           userId,
           ...(status && { status })
@@ -346,7 +344,7 @@ Example task structure:
         sessionId: data.sessionId 
       });
 
-      const task = await prisma.task.create({
+      const task = await db.task.create({
         data: {
           sessionId: data.sessionId,
           userId: data.userId,
@@ -381,7 +379,7 @@ Example task structure:
         throw new Error(`Invalid status: ${status}. Must be one of: ${validStatuses.join(', ')}`);
       }
 
-      await prisma.task.update({
+      await db.task.update({
         where: { id: taskId },
         data: { status }
       });
@@ -404,7 +402,7 @@ Example task structure:
     try {
       logger.info('[Task] Deleting task', { taskId });
 
-      await prisma.task.delete({
+      await db.task.delete({
         where: { id: taskId }
       });
 
@@ -477,11 +475,11 @@ Example task structure:
       logger.debug('[Task] Fetching task stats', { userId });
 
       const [total, pending, inProgress, done, cancelled] = await Promise.all([
-        prisma.task.count({ where: { userId } }),
-        prisma.task.count({ where: { userId, status: 'pending' } }),
-        prisma.task.count({ where: { userId, status: 'in_progress' } }),
-        prisma.task.count({ where: { userId, status: 'done' } }),
-        prisma.task.count({ where: { userId, status: 'cancelled' } })
+        db.task.count({ where: { userId } }),
+        db.task.count({ where: { userId, status: 'pending' } }),
+        db.task.count({ where: { userId, status: 'in_progress' } }),
+        db.task.count({ where: { userId, status: 'done' } }),
+        db.task.count({ where: { userId, status: 'cancelled' } })
       ]);
 
       return { total, pending, inProgress, done, cancelled };

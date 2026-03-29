@@ -1,7 +1,5 @@
-import { PrismaClient } from '@prisma/client';
+import db from '@/config/database.js';
 import logger from '@/config/logger.js';
-
-const prisma = new PrismaClient();
 
 interface CreateWorkflowData {
   userId: string;
@@ -47,7 +45,7 @@ class WorkflowRepository {
    */
   async createWorkflow(data: CreateWorkflowData) {
     try {
-      const workflow = await prisma.workflow.create({
+      const workflow = await db.workflow.create({
         data: {
           userId: data.userId,
           sessionId: data.sessionId,
@@ -86,7 +84,7 @@ class WorkflowRepository {
    * Get workflow by ID with steps and results
    */
   async getWorkflow(workflowId: string) {
-    return await prisma.workflow.findUnique({
+    return await db.workflow.findUnique({
       where: { id: workflowId },
       include: {
         steps: {
@@ -103,7 +101,7 @@ class WorkflowRepository {
    * Update workflow
    */
   async updateWorkflow(workflowId: string, data: UpdateWorkflowData) {
-    return await prisma.workflow.update({
+    return await db.workflow.update({
       where: { id: workflowId },
       data
     });
@@ -113,7 +111,7 @@ class WorkflowRepository {
    * Update workflow step
    */
   async updateStep(workflowId: string, stepId: string, data: UpdateStepData) {
-    return await prisma.workflowStep.update({
+    return await db.workflowStep.update({
       where: {
         workflowId_stepId: {
           workflowId,
@@ -128,7 +126,7 @@ class WorkflowRepository {
    * Store step result
    */
   async storeResult(workflowId: string, stepId: string, output: any) {
-    return await prisma.workflowResult.create({
+    return await db.workflowResult.create({
       data: {
         workflowId,
         stepId,
@@ -144,7 +142,7 @@ class WorkflowRepository {
     const now = new Date();
     const lockTimeout = new Date(now.getTime() - 5 * 60 * 1000); // 5 minutes
 
-    return await prisma.workflow.findMany({
+    return await db.workflow.findMany({
       where: {
         status: {
           in: ['pending', 'running']
@@ -172,7 +170,7 @@ class WorkflowRepository {
       const now = new Date();
       const lockTimeout = new Date(now.getTime() - 5 * 60 * 1000);
 
-      const result = await prisma.workflow.updateMany({
+      const result = await db.workflow.updateMany({
         where: {
           id: workflowId,
           OR: [
@@ -197,7 +195,7 @@ class WorkflowRepository {
    * Release workflow lock
    */
   async unlockWorkflow(workflowId: string, workerId: string) {
-    await prisma.workflow.updateMany({
+    await db.workflow.updateMany({
       where: {
         id: workflowId,
         lockedBy: workerId
@@ -213,7 +211,7 @@ class WorkflowRepository {
    * Get workflows by user
    */
   async getWorkflowsByUser(userId: string, limit: number = 50) {
-    return await prisma.workflow.findMany({
+    return await db.workflow.findMany({
       where: { userId },
       include: {
         steps: {
@@ -235,7 +233,7 @@ class WorkflowRepository {
    * Get workflows by session
    */
   async getWorkflowsBySession(sessionId: string) {
-    return await prisma.workflow.findMany({
+    return await db.workflow.findMany({
       where: { sessionId },
       include: {
         steps: true,
@@ -251,7 +249,7 @@ class WorkflowRepository {
    * Get step by workflow and step ID
    */
   async getStep(workflowId: string, stepId: string) {
-    return await prisma.workflowStep.findUnique({
+    return await db.workflowStep.findUnique({
       where: {
         workflowId_stepId: {
           workflowId,
@@ -265,7 +263,7 @@ class WorkflowRepository {
    * Get all results for a workflow
    */
   async getResults(workflowId: string) {
-    return await prisma.workflowResult.findMany({
+    return await db.workflowResult.findMany({
       where: { workflowId },
       orderBy: { createdAt: 'asc' }
     });
@@ -275,7 +273,7 @@ class WorkflowRepository {
    * Add step to retry queue
    */
   async addToQueue(workflowId: string, stepId: string, priority: number = 0, retryCount: number = 0) {
-    return await prisma.workflowQueue.create({
+    return await db.workflowQueue.create({
       data: {
         workflowId,
         stepId,
@@ -290,7 +288,7 @@ class WorkflowRepository {
    * Get next queued item
    */
   async getNextQueuedItem() {
-    const items = await prisma.workflowQueue.findMany({
+    const items = await db.workflowQueue.findMany({
       where: {
         scheduledAt: {
           lte: new Date()
@@ -310,7 +308,7 @@ class WorkflowRepository {
    * Remove from queue
    */
   async removeFromQueue(queueId: string) {
-    await prisma.workflowQueue.delete({
+    await db.workflowQueue.delete({
       where: { id: queueId }
     });
   }
@@ -319,7 +317,7 @@ class WorkflowRepository {
    * Get timed out steps
    */
   async getTimedOutSteps() {
-    return await prisma.workflowStep.findMany({
+    return await db.workflowStep.findMany({
       where: {
         status: 'running',
         timeoutAt: {
@@ -339,7 +337,7 @@ class WorkflowRepository {
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - daysOld);
 
-    const result = await prisma.workflow.deleteMany({
+    const result = await db.workflow.deleteMany({
       where: {
         status: 'completed',
         completedAt: {
@@ -359,11 +357,11 @@ class WorkflowRepository {
     const where = userId ? { userId } : {};
 
     const [total, pending, running, completed, failed] = await Promise.all([
-      prisma.workflow.count({ where }),
-      prisma.workflow.count({ where: { ...where, status: 'pending' } }),
-      prisma.workflow.count({ where: { ...where, status: 'running' } }),
-      prisma.workflow.count({ where: { ...where, status: 'completed' } }),
-      prisma.workflow.count({ where: { ...where, status: 'failed' } })
+      db.workflow.count({ where }),
+      db.workflow.count({ where: { ...where, status: 'pending' } }),
+      db.workflow.count({ where: { ...where, status: 'running' } }),
+      db.workflow.count({ where: { ...where, status: 'completed' } }),
+      db.workflow.count({ where: { ...where, status: 'failed' } })
     ]);
 
     return {

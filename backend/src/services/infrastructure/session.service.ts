@@ -1,7 +1,5 @@
-import { PrismaClient } from '@prisma/client';
+import db from '@/config/database.js';
 import logger from '@/config/logger.js';
-
-const prisma = new PrismaClient();
 
 export interface CreateSessionInput {
   userId: string;
@@ -42,13 +40,13 @@ class SessionService {
    */
   async ensureUserExists(userId: string): Promise<void> {
     try {
-      const user = await prisma.user.findUnique({
+      const user = await db.user.findUnique({
         where: { id: userId }
       });
 
       if (!user) {
         logger.info('[Session] Creating demo user', { userId });
-        await prisma.user.create({
+        await db.user.create({
           data: {
             id: userId,
             email: `${userId}@demo.orin.ai`,
@@ -72,7 +70,7 @@ class SessionService {
     try {
       logger.info('[Session] Creating new session', { userId: input.userId });
 
-      const session = await prisma.chatSession.create({
+      const session = await db.chatSession.create({
         data: {
           userId: input.userId,
           title: input.title || null,
@@ -115,7 +113,7 @@ class SessionService {
         contentLength: input.content.length
       });
 
-      await prisma.message.create({
+      await db.message.create({
         data: {
           chatSessionId: input.sessionId,
           role: input.role,
@@ -126,7 +124,7 @@ class SessionService {
       });
 
       // Update session's updatedAt timestamp
-      await prisma.chatSession.update({
+      await db.chatSession.update({
         where: { id: input.sessionId },
         data: { updatedAt: new Date() }
       });
@@ -151,7 +149,7 @@ class SessionService {
     try {
       logger.debug('[Session] Fetching session', { sessionId });
 
-      const session = await prisma.chatSession.findUnique({
+      const session = await db.chatSession.findUnique({
         where: { id: sessionId },
         include: {
           messages: {
@@ -190,7 +188,7 @@ class SessionService {
     try {
       logger.debug('[Session] Fetching recent session', { userId });
 
-      const session = await prisma.chatSession.findFirst({
+      const session = await db.chatSession.findFirst({
         where: { userId },
         orderBy: {
           updatedAt: 'desc'
@@ -233,7 +231,7 @@ class SessionService {
     try {
       logger.debug('[Session] Fetching user sessions', { userId, limit });
 
-      const sessions = await prisma.chatSession.findMany({
+      const sessions = await db.chatSession.findMany({
         where: { userId },
         orderBy: {
           updatedAt: 'desc'
@@ -274,7 +272,7 @@ class SessionService {
     try {
       logger.debug('[Session] Updating session', { sessionId, updates });
 
-      await prisma.chatSession.update({
+      await db.chatSession.update({
         where: { id: sessionId },
         data: updates
       });
@@ -297,7 +295,7 @@ class SessionService {
     try {
       logger.info('[Session] Deleting session', { sessionId });
 
-      await prisma.chatSession.delete({
+      await db.chatSession.delete({
         where: { id: sessionId }
       });
 
